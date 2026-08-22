@@ -48,6 +48,8 @@ Sign up at `/sign-up` — a personal workspace is created automatically.
 | `bun run build` | Production build |
 | `bun run lint` | ESLint |
 | `bun run typecheck` | `tsc --noEmit` |
+| `bun run test` | Unit tests (vitest) |
+| `bun run test:e2e` | Browser tests (Playwright, needs local DB) |
 | `bun run db:generate` | Generate migration SQL from schema changes |
 | `bun run db:migrate` | Apply migrations to `DATABASE_URL` |
 | `bun run db:studio` | Drizzle Studio (browse data) |

@@ -79,5 +79,16 @@ Better Auth with email/password (`src/lib/auth/server.ts`). Notes:
 ```bash
 bun run typecheck
 bun run lint
+bun run test
 bun run build
+bun run test:e2e   # requires the dev database; starts its own server on :3100
 ```
+
+### Testing
+
+- **Unit** (`src/**/*.test.ts`, vitest): markdown serialization round-trips,
+  pure helpers. No database required.
+- **E2E** (`e2e/*.spec.ts`, Playwright): the critical journey — sign up,
+  create document, edit, autosave, reload, persistence, folders, export.
+  Needs a migrated database reachable via `DATABASE_URL`; Playwright boots the
+  app on port 3100 itself.
