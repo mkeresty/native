@@ -16,6 +16,9 @@
   --color-editor-background: var(--editor-background);
   --color-editor-foreground: var(--editor-foreground);
   --color-editor-muted-foreground: var(--editor-muted-foreground);
+  --color-editor-prose: var(--editor-prose);
+  --color-editor-control: var(--editor-control);
+  --color-editor-control-border: var(--editor-control-border);
   --color-editor-selection: var(--editor-selection);
   --color-code-background: var(--code-background);
   --color-code-foreground: var(--code-foreground);
@@ -25,8 +28,10 @@
   --color-comment: var(--comment-background);
   --color-callout: var(--callout-background);
   --color-callout-border: var(--callout-border);
+  --color-callout-foreground: var(--callout-foreground);
   --color-toolbar: var(--toolbar);
   --color-toolbar-border: var(--toolbar-border);
+  --color-sidebar-marker: var(--sidebar-marker);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -74,15 +79,15 @@
   --popover-foreground: #202a23;
   --primary: oklch(0.23 0.025 154);
   --primary-foreground: oklch(0.975 0.012 90);
-  --secondary: oklch(0.93 0.018 92);
+  --secondary: #e8e5db;
   --secondary-foreground: oklch(0.29 0.024 150);
   --muted: oklch(0.945 0.012 90);
   --muted-foreground: oklch(0.51 0.018 150);
-  --accent: oklch(0.89 0.04 115);
-  --accent-foreground: oklch(0.27 0.035 145);
+  --accent: #e2e8d0;
+  --accent-foreground: #31412f;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.86 0.014 88);
-  --input: oklch(0.86 0.014 88);
+  --border: #dedbd3;
+  --input: #dedbd3;
   --ring: oklch(0.52 0.09 255);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -95,30 +100,40 @@
   --workspace: #f6f3ed;
   --editor-canvas-shadow: 0 18px 45px oklch(0.25 0.02 150 / 8%);
   --editor-background: #f6f3ed;
-  --editor-foreground: oklch(0.19 0.018 148);
-  --editor-muted-foreground: oklch(0.51 0.018 150);
+  --editor-foreground: #1f2921;
+  --editor-muted-foreground: #69716a;
+  /* Body copy sits a step lighter than headings, as in the reference. */
+  --editor-prose: #4d554e;
+  /* Raised controls in the document top bar (Share, export). */
+  --editor-control: #fffdf9;
+  --editor-control-border: #c9c9bf;
   --editor-selection: oklch(0.52 0.09 255 / 16%);
   --code-background: oklch(0.95 0.014 90);
   --code-foreground: oklch(0.25 0.026 155);
-  --status-online: oklch(0.62 0.12 145);
-  --user-avatar: #d9ad7c;
-  --task-checkbox: #6f946e;
+  --status-online: #6fac69;
+  --user-avatar: #d3ab84;
+  --task-checkbox: #728b6c;
+  --task-checkbox-border: #aeb6a9;
   --presence-1: oklch(0.59 0.13 35);
   --presence-2: oklch(0.54 0.09 245);
   --presence-3: oklch(0.58 0.09 85);
   --comment-background: oklch(0.98 0.012 90);
-  --callout-background: oklch(0.94 0.028 112);
-  --callout-border: oklch(0.61 0.09 130);
+  --callout-background: #eef1e4;
+  --callout-border: #92a872;
+  --callout-foreground: #394536;
   --toolbar: oklch(0.985 0.006 90 / 94%);
   --toolbar-border: oklch(0.82 0.018 88);
-  --sidebar: #1d2924;
-  --sidebar-foreground: #e6e8df;
-  --sidebar-primary: #dce4b3;
-  --sidebar-primary-foreground: #263027;
-  --sidebar-accent: #34463d;
-  --sidebar-accent-foreground: #f7f6f2;
-  --sidebar-border: #40534a;
+  --sidebar: #1e2925;
+  --sidebar-foreground: #e7e8de;
+  --sidebar-primary: #d9dfad;
+  --sidebar-primary-foreground: #1e2925;
+  --sidebar-accent: #314039;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #415049;
   --sidebar-ring: oklch(0.7 0.11 110);
+  /* Status lime for the active-document dot — a touch greener and brighter
+     than --sidebar-primary, which tints the "+" and ⌘ affordances. */
+  --sidebar-marker: #b6d279;
 }
 
 .dark {
@@ -150,18 +165,23 @@
   --editor-background: oklch(0.225 0.018 155);
   --editor-foreground: oklch(0.94 0.01 90);
   --editor-muted-foreground: oklch(0.71 0.015 110);
+  --editor-prose: oklch(0.84 0.012 110);
+  --editor-control: oklch(0.26 0.018 155);
+  --editor-control-border: oklch(0.4 0.02 155);
   --editor-selection: oklch(0.68 0.1 245 / 24%);
   --code-background: oklch(0.18 0.015 155);
   --code-foreground: oklch(0.88 0.02 105);
   --status-online: oklch(0.72 0.12 145);
   --user-avatar: #d9ad7c;
   --task-checkbox: #8dae81;
+  --task-checkbox-border: oklch(0.55 0.02 145);
   --presence-1: oklch(0.7 0.13 35);
   --presence-2: oklch(0.67 0.1 245);
   --presence-3: oklch(0.71 0.1 85);
   --comment-background: oklch(0.27 0.018 155);
   --callout-background: oklch(0.27 0.035 135);
   --callout-border: oklch(0.65 0.1 130);
+  --callout-foreground: oklch(0.92 0.015 110);
   --toolbar: oklch(0.27 0.018 155 / 94%);
   --toolbar-border: oklch(0.4 0.02 155);
   --sidebar: oklch(0.15 0.015 155);
@@ -172,6 +192,7 @@
   --sidebar-accent-foreground: oklch(0.96 0.01 90);
   --sidebar-border: oklch(0.31 0.02 155);
   --sidebar-ring: oklch(0.7 0.11 110);
+  --sidebar-marker: oklch(0.79 0.09 112);
 }
 
 @layer base {
@@ -197,37 +218,49 @@
   }
 }
 
-/* Editor content typography — token-driven, mirrors rendered Markdown. */
+/* Editor content typography — token-driven, mirrors rendered Markdown.
+   Sizes and rhythm follow the design reference: 15px body on a 1.7 leading,
+   23px between blocks, 30px before a heading and 10px after it. */
 .tiptap-prose {
-  @apply text-editor-foreground;
-  font-size: 1rem;
+  color: var(--editor-prose);
+  font-size: 0.9375rem;
   line-height: 1.7;
 }
 
 .tiptap-prose > * + * {
-  margin-top: 0.75em;
+  margin-top: 23px;
+}
+
+/* The document's opening block sits flush under the toolbar rule. */
+.tiptap-prose > :first-child {
+  margin-top: 0;
 }
 
 .tiptap-prose h1,
 .tiptap-prose h2,
 .tiptap-prose h3,
 .tiptap-prose h4 {
-  @apply font-heading font-medium tracking-[-0.025em] text-editor-foreground;
-  line-height: 1.3;
-  margin-top: 1.6em;
+  @apply font-heading font-medium text-editor-foreground;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-top: 30px;
+}
+
+.tiptap-prose :is(h1, h2, h3, h4) + * {
+  margin-top: 10px;
 }
 
 .tiptap-prose h1 {
-  font-size: 2.25rem;
+  font-size: 2rem;
 }
 .tiptap-prose h2 {
-  font-size: 2rem;
+  font-size: 1.625rem;
 }
 .tiptap-prose h3 {
   font-size: 1.25rem;
 }
 .tiptap-prose h4 {
-  font-size: 1.05rem;
+  font-size: 1.0625rem;
 }
 
 .tiptap-prose ul,
@@ -248,30 +281,58 @@
   margin-top: 0.25em;
 }
 
-/* Task lists */
+/* Task lists read as a checklist block, set off by a rule above. */
 .tiptap-prose ul[data-type="taskList"] {
   list-style: none;
-  padding-left: 0.25rem;
+  padding-left: 0;
+  border-top: 1px solid var(--border);
+  margin-top: 30px;
+  padding-top: 19px;
 }
 .tiptap-prose ul[data-type="taskList"] li {
   display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  margin-top: 0;
 }
 .tiptap-prose ul[data-type="taskList"] li > label {
-  margin-top: 0.25em;
   flex-shrink: 0;
   user-select: none;
+  display: flex;
+  align-items: center;
 }
 .tiptap-prose ul[data-type="taskList"] input[type="checkbox"] {
-  accent-color: var(--task-checkbox);
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--task-checkbox-border);
+  border-radius: 4px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  transition: background-color 120ms ease, border-color 120ms ease;
 }
+.tiptap-prose ul[data-type="taskList"] input[type="checkbox"]:checked {
+  background: var(--task-checkbox);
+  border-color: var(--task-checkbox);
+}
+.tiptap-prose ul[data-type="taskList"] input[type="checkbox"]:checked::after {
+  content: "✓";
+  color: var(--primary-foreground);
+  font-size: 11px;
+  line-height: 1;
+}
+/* A completed task is marked by its box, not by striking out the text. */
 .tiptap-prose ul[data-type="taskList"] li[data-checked="true"] > div {
-  @apply text-muted-foreground line-through;
+  @apply text-editor-muted-foreground;
 }
 
 .tiptap-prose blockquote {
-  @apply border-l-3 border-callout-border bg-callout pl-5 py-3 text-editor-foreground not-italic;
+  @apply border-l-3 border-callout-border bg-callout px-4 py-[13px] text-callout-foreground not-italic;
+  font-size: 0.875rem;
+  margin: 25px 0;
 }
 
 .tiptap-prose code {

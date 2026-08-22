@@ -1,13 +1,13 @@
 "use client";
 
-import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
+import { ChevronsUpDownIcon, CommandIcon, LogOutIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { useEffect, useTransition } from "react";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -15,6 +15,8 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
@@ -65,34 +67,35 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider style={{ "--sidebar-width": "18rem" } as React.CSSProperties}>
+    <SidebarProvider style={{ "--sidebar-width": "14.75rem" } as React.CSSProperties}>
       <SidebarKeyboardToggle />
       <Sidebar collapsible="icon">
-        <SidebarHeader className="px-4 pt-5 pb-3 group-data-[collapsible=icon]:px-2">
+        <SidebarHeader className="px-[14px] pt-5 pb-0 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pt-4">
           <WorkspaceSwitcher workspaces={workspaces} />
         </SidebarHeader>
         <SidebarContent>
           <DocumentTree folders={folders} documents={documents} />
         </SidebarContent>
-        <SidebarFooter className="mx-4 border-t border-sidebar-border px-0 pt-4 pb-4 group-data-[collapsible=icon]:mx-2">
-          <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-            <div className="min-w-0 flex-1">
-              <UserMenu user={user} />
-            </div>
-            <ThemeToggle />
+        {/* Anchored to the bottom of the sidebar, below a full-width rule —
+            the navigation keeps whatever vertical space is left over. */}
+        <SidebarFooter className="mt-auto gap-0 p-0 pb-5 group-data-[collapsible=icon]:pb-4">
+          <div className="mx-[14px] h-px bg-sidebar-border group-data-[collapsible=icon]:mx-2" />
+          <div className="px-[22px] pt-4 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pt-4">
+            <UserMenu user={user} />
           </div>
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
       <SidebarInset className="bg-workspace">
         <div className="relative flex h-svh min-h-svh flex-col">
-          {/* Wrapper owns the centering transform; the button keeps its own
-              press animation without fighting translate utilities. */}
-          <div className="absolute top-1/2 left-0 z-20 -translate-x-1/2 -translate-y-1/2">
+          {/* Lives in the shell rather than the document top bar so every page
+              under /app has it. Positioned to land in the 57px top bar's left
+              gutter — which the bar reserves via its extra left padding. */}
+          <div className="absolute top-[15px] left-5 z-20 sm:left-7">
             <SidebarTrigger
               aria-label="Toggle sidebar (⌘\)"
               title="Toggle sidebar (⌘\)"
-              className="rounded-full border border-border bg-editor-background shadow-sm"
+              className="size-[27px] rounded-md text-editor-muted-foreground hover:bg-secondary hover:text-foreground"
             />
           </div>
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
@@ -126,13 +129,21 @@ function WorkspaceSwitcher({ workspaces }: { workspaces: WorkspaceSummary[] }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<SidebarMenuButton size="lg" aria-label="Switch workspace" />}
+        render={
+          <SidebarMenuButton
+            size="lg"
+            aria-label="Switch workspace"
+            className="h-auto gap-2.5 rounded-lg px-[7px] py-[3px] text-[15px] font-bold hover:bg-transparent active:bg-transparent group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!"
+          />
+        }
       >
-        <span className="flex aspect-square size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary font-heading text-xl font-semibold text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8">
+        <span className="flex aspect-square size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary font-heading text-[18px] font-semibold text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:text-lg">
           A
         </span>
-        <span className="truncate font-heading text-lg font-semibold tracking-tight group-data-[collapsible=icon]:hidden">atelier</span>
-        <ChevronsUpDownIcon className="ml-auto opacity-60 group-data-[collapsible=icon]:hidden" />
+        <span className="truncate leading-[1.35] font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+          atelier
+        </span>
+        <ChevronsUpDownIcon className="ml-auto size-3.5 opacity-0 transition-opacity duration-150 group-hover/menu-button:opacity-50 group-data-[collapsible=icon]:hidden" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="bottom" className="w-56">
         <DropdownMenuGroup>
@@ -163,6 +174,7 @@ function initials(name: string): string {
 
 function UserMenu({ user }: { user: ShellUser }) {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
 
   async function handleSignOut() {
@@ -185,24 +197,41 @@ function UserMenu({ user }: { user: ShellUser }) {
             size="lg"
             aria-label={`Account: ${user.name}`}
             disabled={isPending}
+            className="h-auto gap-2 rounded-lg px-0 py-0 text-xs hover:bg-transparent active:bg-transparent group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!"
           />
         }
       >
         <Spinner
-          className={isPending ? "block" : "hidden"}
+          className={cn("size-4", isPending ? "block" : "hidden")}
           aria-hidden={isPending ? undefined : true}
         />
-        <Avatar className={cn("size-6", isPending && "hidden")}>
+        <Avatar className={cn("size-[25px]", isPending && "hidden")}>
           {user.image ? <AvatarImage src={user.image} alt="" /> : null}
-          <AvatarFallback className="bg-user-avatar font-mono text-[10px] text-sidebar-primary-foreground">
+          <AvatarFallback className="bg-user-avatar text-[10px] font-extrabold text-sidebar-primary-foreground">
             {initials(user.name)}
           </AvatarFallback>
         </Avatar>
-        <span className="truncate text-xs font-medium">{user.name}</span>
+        <span className="truncate font-normal text-sidebar-foreground/85 group-data-[collapsible=icon]:hidden">
+          {user.name}
+        </span>
+        {/* Keyboard affordance: the row is the account menu's trigger. */}
+        <CommandIcon className="ml-auto size-[17px] text-sidebar-primary group-data-[collapsible=icon]:hidden" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" className="w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Theme</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={theme}
+            onValueChange={(value) => setTheme(value as string)}
+          >
+            <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="system">System</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => void handleSignOut()}>

@@ -10,7 +10,6 @@ import {
   CheckIcon,
   CodeIcon,
   FileCodeIcon,
-  FolderIcon,
   Heading2Icon,
   Heading3Icon,
   ItalicIcon,
@@ -263,13 +262,13 @@ export function DocumentEditor({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-workspace">
-      <header className="document-topbar flex h-20 shrink-0 items-center justify-between gap-4 border-b px-5 sm:px-8">
-        <div className="flex min-w-0 items-center gap-3 text-sm text-muted-foreground sm:text-base">
-          <FolderIcon className="shrink-0 text-sidebar-primary" />
+      {/* Left padding reserves the gutter for the shell's sidebar toggle. */}
+      <header className="document-topbar flex h-[57px] shrink-0 items-center justify-between gap-[18px] border-b pr-5 pl-[55px] text-xs text-editor-muted-foreground sm:pr-7 sm:pl-[63px]">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="max-w-32 leading-tight sm:max-w-44">
             {initialDocument.folderName ?? "Workspace"}
           </span>
-          <span aria-hidden className="text-lg">/</span>
+          <span aria-hidden>/</span>
           <span className="truncate leading-tight">{title || "Untitled"}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -277,15 +276,19 @@ export function DocumentEditor({
           <Collaborators />
           <Button
             variant="outline"
-            size="icon"
-            className="hidden sm:inline-flex"
+            size="icon-sm"
+            className="hidden border-editor-control-border bg-editor-control text-foreground hover:bg-secondary sm:inline-flex"
             aria-label="Export .md"
             title="Download as Markdown (.md)"
             onClick={() => void handleExport()}
           >
             <DownloadIcon />
           </Button>
-          <Button variant="outline" size="default" className="hidden sm:inline-flex">
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden rounded-[7px] border-editor-control-border bg-editor-control px-2.5 py-[7px] text-xs font-semibold text-foreground hover:bg-secondary sm:inline-flex"
+          >
             <Share2Icon data-icon="inline-start" />
             Share
           </Button>
@@ -301,7 +304,7 @@ export function DocumentEditor({
               value="write"
               aria-label="Write mode"
               title="Write mode"
-              className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
+              className="rounded-md border-0 px-2 py-[7px] text-xs text-editor-muted-foreground aria-pressed:bg-accent aria-pressed:font-bold aria-pressed:text-accent-foreground"
             >
               Write
             </ToggleGroupItem>
@@ -309,7 +312,7 @@ export function DocumentEditor({
               value="read"
               aria-label="Read mode"
               title="Read mode"
-              className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
+              className="rounded-md border-0 px-2 py-[7px] text-xs text-editor-muted-foreground aria-pressed:bg-accent aria-pressed:font-bold aria-pressed:text-accent-foreground"
             >
               Read
             </ToggleGroupItem>
@@ -322,7 +325,11 @@ export function DocumentEditor({
         onScroll={handleScroll}
         className="min-h-0 flex-1 overflow-y-auto bg-editor-background"
       >
-        <div className="mx-auto w-full max-w-3xl px-6 pt-8 pb-16 sm:px-10">
+        <div className="mx-auto w-full max-w-[760px] px-6 pt-9 pb-15 sm:px-10">
+          {/* Eyebrow above the title; save state lives in the top bar. */}
+          <div className="mb-[15px] flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-editor-muted-foreground">
+            <span>Updated {formatRelativeTime(lastActivity)}</span>
+          </div>
           <input
             value={title}
             onChange={(event) => markDirtyTitle(event.target.value)}
@@ -330,19 +337,22 @@ export function DocumentEditor({
             readOnly={viewMode === "read"}
             placeholder="Untitled"
             aria-label="Document title"
-            style={{ fontSize: `${2.75 - 0.95 * scrollProgress}rem` }}
-            className="mt-2 w-full bg-transparent font-heading leading-tight font-medium tracking-[-0.04em] text-editor-foreground outline-none transition-[font-size] duration-75 ease-out placeholder:text-muted-foreground/60"
+            style={{ fontSize: `${2.6875 - 0.95 * scrollProgress}rem` }}
+            className="mb-3.5 w-full bg-transparent font-heading leading-[1.05] font-medium tracking-[-0.045em] text-editor-foreground outline-none transition-[font-size] duration-75 ease-out placeholder:text-muted-foreground/60"
           />
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:text-sm">
-            <span>{initialDocument.authorName}</span>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b pb-6 text-xs text-muted-foreground">
+            {initialDocument.folderName ? (
+              <span className="rounded-full bg-muted px-2 py-1 font-semibold text-secondary-foreground">
+                {initialDocument.folderName}
+              </span>
+            ) : null}
+            <span>Owned by {initialDocument.authorName}</span>
             {readingTime ? (
               <>
                 <span aria-hidden>·</span>
                 <span>{readingTime} min read</span>
               </>
             ) : null}
-            <span aria-hidden>·</span>
-            <span>Updated {formatRelativeTime(lastActivity)}</span>
           </div>
           {editor && viewMode === "write" ? (
             <>
@@ -352,7 +362,7 @@ export function DocumentEditor({
                 isSourceMode={isSourceMode}
                 onToggleSourceMode={toggleSourceMode}
                 isStuck={isToolbarStuck}
-                className="sticky top-2 z-10 mt-4 mb-6"
+                className="sticky top-0 z-10 mb-[34px]"
               />
               {isSourceMode ? (
                 <textarea
@@ -364,11 +374,15 @@ export function DocumentEditor({
                   className="block min-h-140 w-full resize-none border-0 bg-code-background p-6 font-mono text-sm leading-7 text-code-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
               ) : (
-                <EditorContent editor={editor} />
+                <div className="max-w-[650px]">
+                  <EditorContent editor={editor} />
+                </div>
               )}
             </>
         ) : editor ? (
-            <EditorContent editor={editor} />
+            <div className="max-w-[650px]">
+              <EditorContent editor={editor} />
+            </div>
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
             Loading editor…
@@ -388,8 +402,8 @@ function Collaborators() {
         ["JM", "bg-presence-2"],
         ["PK", "bg-presence-3"],
       ].map(([initials, color]) => (
-        <Avatar key={initials} className="size-7 border-2 border-card">
-          <AvatarFallback className={cn(color, "font-mono text-[10px] text-primary-foreground")}>
+        <Avatar key={initials} className="size-[25px] border-2 border-card">
+          <AvatarFallback className={cn(color, "font-mono text-[9px] font-extrabold text-primary-foreground")}>
             {initials}
           </AvatarFallback>
         </Avatar>
@@ -416,7 +430,10 @@ function SaveStatusIndicator({
             ? `Saved ${savedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
             : "Saved";
   return (
-    <span className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
+    <span
+      className="inline-flex items-center gap-1.5 text-xs text-editor-muted-foreground"
+      role="status"
+    >
       <span
         aria-hidden
         className={cn(
@@ -452,7 +469,10 @@ function ToolbarButton({
       title={label}
       aria-pressed={active}
       onClick={onClick}
-      className={cn(active && "bg-accent text-accent-foreground")}
+      className={cn(
+        "size-[27px] min-w-[27px] rounded-md text-editor-foreground hover:bg-secondary [&_svg:not([class*='size-'])]:size-[15px]",
+        active && "bg-secondary text-foreground",
+      )}
     >
       {children}
     </Button>
@@ -496,8 +516,10 @@ function Toolbar({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 rounded-xl border border-toolbar-border bg-toolbar px-2 py-1 shadow-xs backdrop-blur",
-        isStuck && "shadow-sm",
+        // Flat rule rather than a floating pill; the background only exists so
+        // scrolled content does not show through while the bar is stuck.
+        "flex items-center gap-1 border-b bg-editor-background py-[13px]",
+        isStuck && "shadow-[0_6px_12px_-10px_var(--toolbar-border)]",
         className,
       )}
     >
@@ -530,7 +552,7 @@ function Toolbar({
         <CodeIcon />
       </ToolbarButton>
 
-      <Separator orientation="vertical" className="mx-1.5 !h-4 !self-center opacity-70" />
+      <Separator orientation="vertical" className="mx-[5px] !h-[25px] !self-center" />
 
       <ToolbarButton
         label="Heading 2"
@@ -551,7 +573,7 @@ function Toolbar({
         <Heading3Icon />
       </ToolbarButton>
 
-      <Separator orientation="vertical" className="mx-1.5 !h-4 !self-center opacity-70" />
+      <Separator orientation="vertical" className="mx-[5px] !h-[25px] !self-center" />
 
       <ToolbarButton
         label="Bullet list (⌘⇧8)"
@@ -590,7 +612,7 @@ function Toolbar({
 
       <LinkPopover active={state.link} editor={editor} />
 
-      <Separator orientation="vertical" className="mx-1.5 !h-4 !self-center opacity-70" />
+      <Separator orientation="vertical" className="mx-[5px] !h-[25px] !self-center" />
 
       <ToolbarButton
         label="Markdown source"

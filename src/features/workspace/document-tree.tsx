@@ -3,9 +3,7 @@
 import {
   FolderPlusIcon,
   CopyIcon,
-  FileTextIcon,
   FolderIcon,
-  FolderOpenIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
@@ -60,7 +58,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import {
+  BranchGlyph,
+  CollectionGlyph,
+  PageGlyph,
+} from "@/features/workspace/nav-glyphs";
 import {
   SidebarGroup,
   SidebarMenu,
@@ -73,7 +77,11 @@ import {
 } from "@/components/ui/sidebar";
 
 export type TreeFolder = { id: string; name: string };
-export type TreeDocument = { id: string; title: string; folderId: string | null };
+export type TreeDocument = {
+  id: string;
+  title: string;
+  folderId: string | null;
+};
 
 type PendingFolderDelete = TreeFolder | null;
 
@@ -88,6 +96,56 @@ async function runTreeAction(
   else router.refresh();
 }
 
+/**
+ * Row geometry mirrors the design reference exactly: 236px rail, 13px nav rows
+ * at 8px/9px padding, 12px document rows indented 18px, all on an 8px radius.
+ * Weight stays regular throughout — the active row separates by fill and
+ * brightness, never by bolding.
+ */
+const NAV_ROW = [
+  "h-auto gap-[9px] rounded-lg px-[9px] py-2 text-[13px] leading-[1.35] font-normal",
+  "text-sidebar-foreground/85 hover:bg-sidebar-accent/55 hover:text-sidebar-foreground",
+  // The active collection carries the "+", which gives its row a taller line box.
+  "data-active:bg-sidebar-accent data-active:py-[11px] data-active:font-normal data-active:text-sidebar-accent-foreground",
+  "[&_svg]:size-[15px] [&_svg]:text-sidebar-foreground/70",
+  "data-active:[&_svg]:text-sidebar-accent-foreground",
+  // Room for the trailing "+" and the overflow control.
+  "group-has-data-[sidebar=menu-action]/menu-item:pr-14",
+  "group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2!",
+].join(" ");
+
+/** Trailing controls sit centred on the row rather than pinned to its top. */
+const NAV_ACTION = [
+  "top-1/2 right-[30px] w-6 -translate-y-1/2 rounded-md",
+  "peer-data-[size=default]/menu-button:top-1/2 peer-data-[size=lg]/menu-button:top-1/2",
+  "peer-data-[size=sm]/menu-button:top-1/2",
+  "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+  "opacity-0 transition-opacity duration-150 group-focus-within/row:opacity-100",
+  "group-hover/row:opacity-100 aria-expanded:opacity-100",
+].join(" ");
+
+/**
+ * Nested documents sit on the bare sidebar background — no rail, no border.
+ * The hierarchy is carried by the 18px indent and the ↳ connector alone.
+ */
+const NAV_SUB_ROW = [
+  "h-auto translate-x-0 gap-[9px] rounded-lg px-[9px] py-2 pr-8 font-normal",
+  "leading-[1.35] text-sidebar-foreground/70 data-[size=md]:text-[12px]",
+  "hover:bg-sidebar-accent/45 hover:text-sidebar-foreground",
+  "data-active:bg-transparent data-active:text-sidebar-foreground",
+  "[&>svg]:size-[14px] [&>svg]:text-sidebar-foreground/55",
+  "data-active:[&>svg]:text-sidebar-foreground/70",
+].join(" ");
+
+const SUB_ACTION = [
+  "top-1/2 right-[5px] w-6 -translate-y-1/2 rounded-md",
+  "peer-data-[size=default]/menu-button:top-1/2 peer-data-[size=lg]/menu-button:top-1/2",
+  "peer-data-[size=sm]/menu-button:top-1/2",
+  "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+  "opacity-0 transition-opacity duration-150 group-focus-within/menu-sub-item:opacity-100",
+  "group-hover/menu-sub-item:opacity-100 aria-expanded:opacity-100",
+].join(" ");
+
 export function DocumentTree({
   folders,
   documents,
@@ -97,9 +155,9 @@ export function DocumentTree({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [folderDialogFor, setFolderDialogFor] = useState<TreeFolder | "new" | null>(
-    null,
-  );
+  const [folderDialogFor, setFolderDialogFor] = useState<
+    TreeFolder | "new" | null
+  >(null);
   const [pendingFolderDelete, setPendingFolderDelete] =
     useState<PendingFolderDelete>(null);
 
@@ -116,17 +174,20 @@ export function DocumentTree({
   }
 
   return (
-    <SidebarGroup className="px-4 py-3 group-data-[collapsible=icon]:px-2">
-      <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:hidden">
-        <span className="text-sm font-medium tracking-[0.18em] text-sidebar-foreground/70">
+    <SidebarGroup className="gap-0 px-[14px] pt-6 pb-0 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pt-4">
+      {/* Section marker. Creation controls stay hidden until the row is
+          hovered or focused so the resting state is just the label. */}
+      <div className="group/section flex items-center justify-between px-[9px] pb-[7px] group-data-[collapsible=icon]:hidden">
+        <span className="text-[10px] leading-[1.35] font-normal tracking-[0.12em] text-sidebar-foreground/60 uppercase">
           Collections
         </span>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/section:opacity-100 focus-within:opacity-100">
           <Button
             variant="ghost"
             size="icon-xs"
             aria-label="New document"
             title="New document"
+            className="-my-[5px] shrink-0 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             onClick={handleNewDocument}
           >
             <PlusIcon />
@@ -136,6 +197,7 @@ export function DocumentTree({
             size="icon-xs"
             aria-label="New collection"
             title="New collection"
+            className="-my-[5px] shrink-0 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             onClick={() => setFolderDialogFor("new")}
           >
             <FolderPlusIcon />
@@ -143,11 +205,12 @@ export function DocumentTree({
         </div>
       </div>
 
-      <SidebarMenu>
-        {folders.map((folder) => (
+      <SidebarMenu className="gap-0">
+        {folders.map((folder, index) => (
           <FolderNode
             key={folder.id}
             folder={folder}
+            index={index}
             documents={documents.filter((doc) => doc.folderId === folder.id)}
             activePath={pathname}
             onRename={() => setFolderDialogFor(folder)}
@@ -163,7 +226,7 @@ export function DocumentTree({
           />
         ))}
         {folders.length === 0 && documents.length === 0 ? (
-          <li className="px-2 py-6 text-center text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+          <li className="px-[9px] py-6 text-xs leading-relaxed text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">
             No documents yet.
             <br />
             Use + above to create one.
@@ -172,16 +235,22 @@ export function DocumentTree({
       </SidebarMenu>
 
       <NameDialog
-        key={folderDialogFor === "new" ? "new" : (folderDialogFor?.id ?? "closed")}
+        key={
+          folderDialogFor === "new" ? "new" : (folderDialogFor?.id ?? "closed")
+        }
         open={folderDialogFor !== null}
-        title={folderDialogFor === "new" ? "New collection" : "Rename collection"}
+        title={
+          folderDialogFor === "new" ? "New collection" : "Rename collection"
+        }
         description={
           folderDialogFor === "new"
             ? "Collections group related documents."
             : undefined
         }
         initialName={
-          folderDialogFor && folderDialogFor !== "new" ? folderDialogFor.name : ""
+          folderDialogFor && folderDialogFor !== "new"
+            ? folderDialogFor.name
+            : ""
         }
         submitLabel={folderDialogFor === "new" ? "Create" : "Save"}
         onOpenChange={(open) => !open && setFolderDialogFor(null)}
@@ -234,17 +303,20 @@ export function DocumentTree({
 
 function FolderNode({
   folder,
+  index,
   documents,
   activePath,
   onRename,
   onDelete,
 }: {
   folder: TreeFolder;
+  index: number;
   documents: TreeDocument[];
   activePath: string;
   onRename: () => void;
   onDelete: () => void;
 }) {
+  const router = useRouter();
   const hasActiveDoc = documents.some(
     (doc) => activePath === `/app/doc/${doc.id}`,
   );
@@ -256,43 +328,97 @@ function FolderNode({
       className="group/collapsible"
       render={<SidebarMenuItem />}
     >
-      <CollapsibleTrigger render={<SidebarMenuButton tooltip={folder.name} />}>
-        {hasActiveDoc ? <FolderOpenIcon /> : <FolderIcon />}
-        <span className="truncate">{folder.name}</span>
-      </CollapsibleTrigger>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={<SidebarMenuAction aria-label={`Actions for ${folder.name}`} />}
+      {/* The row wrapper is the positioning context for the trailing
+          controls — the <li> also contains the expanded children. */}
+      <div className="group/row relative">
+        <CollapsibleTrigger
+          render={
+            <SidebarMenuButton tooltip={folder.name} isActive={hasActiveDoc} />
+          }
+          className={NAV_ROW}
         >
-          <MoreHorizontalIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" side="right" className="w-40">
-          <DropdownMenuItem onClick={onRename}>
-            <PencilIcon />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={onDelete}>
-            <Trash2Icon />
-            Delete collection
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <CollectionGlyph index={index} />
+          <span className="truncate">{folder.name}</span>
+        </CollapsibleTrigger>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <SidebarMenuAction
+                aria-label={`Actions for ${folder.name}`}
+                className={NAV_ACTION}
+              />
+            }
+          >
+            <MoreHorizontalIcon />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="right" className="w-40">
+            <DropdownMenuItem onClick={onRename}>
+              <PencilIcon />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onClick={onDelete}>
+              <Trash2Icon />
+              Delete collection
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {/* The "+" is the collection's own action, so it stays visible while the
+          collection is the active one and fades in on hover otherwise. */}
+        <SidebarMenuAction
+          aria-label={`New document in ${folder.name}`}
+          title={`New document in ${folder.name}`}
+          className={cn(
+            NAV_ACTION,
+            "right-[5px] text-sidebar-primary hover:bg-sidebar-accent hover:text-sidebar-primary [&>svg]:size-[15px] [&>svg]:stroke-[1.75]",
+            hasActiveDoc && "opacity-100",
+          )}
+          onClick={() =>
+            void runTreeAction(
+              createDocumentAction(folder.id).then((result) => {
+                if (result.ok) router.push(`/app/doc/${result.documentId}`);
+                return result;
+              }),
+              router,
+            )
+          }
+        >
+          <PlusIcon />
+        </SidebarMenuAction>
+      </div>
       <CollapsibleContent>
-        <SidebarMenuSub>
-          {documents.map((doc) => (
-            <SidebarMenuSubItem key={doc.id}>
-              <SidebarMenuSubButton
-                render={<Link href={`/app/doc/${doc.id}`} />}
-                isActive={activePath === `/app/doc/${doc.id}`}
-              >
-                <span className="truncate">{doc.title}</span>
-              </SidebarMenuSubButton>
-              <DocumentActionsMenu document={doc} folders={[folder]} />
-            </SidebarMenuSubItem>
-          ))}
-          {documents.length === 0 ? (
-            <li className="px-2 py-1 text-xs text-muted-foreground">Empty</li>
-          ) : null}
+        <SidebarMenuSub
+          className={cn(
+            "mx-0 translate-x-0 gap-0 border-l-0 px-0 py-0 pl-[18px]",
+            // Only a populated collection earns the break before the next one.
+            documents.length > 0 && "mb-[18px]",
+          )}
+        >
+          {documents.map((doc) => {
+            const active = activePath === `/app/doc/${doc.id}`;
+            return (
+              <SidebarMenuSubItem key={doc.id}>
+                <SidebarMenuSubButton
+                  render={<Link href={`/app/doc/${doc.id}`} />}
+                  isActive={active}
+                  className={NAV_SUB_ROW}
+                >
+                  <BranchGlyph />
+                  <span className="truncate">{doc.title}</span>
+                </SidebarMenuSubButton>
+                {active ? (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-1/2 right-[9px] size-[7px] -translate-y-1/2 rounded-full bg-sidebar-marker transition-opacity duration-150 group-focus-within/menu-sub-item:opacity-0 group-hover/menu-sub-item:opacity-0"
+                  />
+                ) : null}
+                <DocumentActionsMenu
+                  document={doc}
+                  folders={[folder]}
+                  className={SUB_ACTION}
+                />
+              </SidebarMenuSubItem>
+            );
+          })}
         </SidebarMenuSub>
       </CollapsibleContent>
     </Collapsible>
@@ -309,12 +435,27 @@ function DocumentNode({
   active: boolean;
 }) {
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton render={<Link href={`/app/doc/${document.id}`} />} isActive={active} tooltip={document.title}>
-        <FileTextIcon />
+    <SidebarMenuItem className="group/row">
+      <SidebarMenuButton
+        render={<Link href={`/app/doc/${document.id}`} />}
+        isActive={active}
+        tooltip={document.title}
+        className={NAV_ROW}
+      >
+        <PageGlyph />
         <span className="truncate">{document.title}</span>
       </SidebarMenuButton>
-      <DocumentActionsMenu document={document} folders={folders} />
+      {active ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 right-[13px] size-[7px] -translate-y-1/2 rounded-full bg-sidebar-marker transition-opacity duration-150 group-focus-within/row:opacity-0 group-hover/row:opacity-0"
+        />
+      ) : null}
+      <DocumentActionsMenu
+        document={document}
+        folders={folders}
+        className={cn(NAV_ACTION, "right-[5px]")}
+      />
     </SidebarMenuItem>
   );
 }
@@ -322,9 +463,11 @@ function DocumentNode({
 function DocumentActionsMenu({
   document,
   folders,
+  className,
 }: {
   document: TreeDocument;
   folders: TreeFolder[];
+  className?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -333,7 +476,10 @@ function DocumentActionsMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <SidebarMenuAction aria-label={`Actions for ${document.title}`} />
+          <SidebarMenuAction
+            aria-label={`Actions for ${document.title}`}
+            className={className}
+          />
         }
       >
         <MoreHorizontalIcon />
@@ -355,7 +501,10 @@ function DocumentActionsMenu({
           <DropdownMenuSubContent className="w-44">
             <DropdownMenuItem
               onClick={() =>
-                void runTreeAction(moveDocumentAction(document.id, null), router)
+                void runTreeAction(
+                  moveDocumentAction(document.id, null),
+                  router,
+                )
               }
             >
               Workspace root
@@ -364,7 +513,10 @@ function DocumentActionsMenu({
               <DropdownMenuItem
                 key={folder.id}
                 onClick={() =>
-                  void runTreeAction(moveDocumentAction(document.id, folder.id), router)
+                  void runTreeAction(
+                    moveDocumentAction(document.id, folder.id),
+                    router,
+                  )
                 }
               >
                 {folder.name}
@@ -438,7 +590,9 @@ function NameDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {description ? <DialogDescription>{description}</DialogDescription> : null}
+          {description ? (
+            <DialogDescription>{description}</DialogDescription>
+          ) : null}
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <FieldGroup className="gap-4">
@@ -455,7 +609,11 @@ function NameDialog({
             </Field>
           </FieldGroup>
           <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={pending || !name.trim()}>
