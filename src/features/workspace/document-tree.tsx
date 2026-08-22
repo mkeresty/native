@@ -1,11 +1,11 @@
 "use client";
 
 import {
+  FolderPlusIcon,
   CopyIcon,
   FileTextIcon,
   FolderIcon,
   FolderOpenIcon,
-  FolderPlusIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
@@ -25,7 +25,6 @@ import {
   moveDocumentAction,
   renameFolderAction,
 } from "@/features/documents/actions";
-import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +37,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -49,6 +53,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -56,11 +61,32 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  SidebarGroup,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+} from "@/components/ui/sidebar";
 
 export type TreeFolder = { id: string; name: string };
 export type TreeDocument = { id: string; title: string; folderId: string | null };
 
 type PendingFolderDelete = TreeFolder | null;
+
+type ActionResult = { ok: true } | { ok: false; error: string };
+
+async function runTreeAction(
+  action: Promise<ActionResult>,
+  router: ReturnType<typeof useRouter>,
+) {
+  const result = await action;
+  if (!result.ok) toast.error(result.error);
+  else router.refresh();
+}
 
 export function DocumentTree({
   folders,
@@ -79,27 +105,29 @@ export function DocumentTree({
 
   const rootDocuments = documents.filter((doc) => doc.folderId === null);
 
-  async function handleNewDocument() {
-    const result = await createDocumentAction(null);
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    router.push(`/app/doc/${result.documentId}`);
-    router.refresh();
+  function handleNewDocument() {
+    void runTreeAction(
+      createDocumentAction(null).then((result) => {
+        if (result.ok) router.push(`/app/doc/${result.documentId}`);
+        return result;
+      }),
+      router,
+    );
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
-      <div className="group/tree flex items-center justify-between px-1.5 py-1.5">
-        <p className="text-xs font-medium text-muted-foreground">Documents</p>
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within/tree:opacity-100 group-hover/tree:opacity-100">
+    <SidebarGroup>
+      <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:hidden">
+        <span className="text-xs font-medium text-sidebar-foreground/70">
+          Documents
+        </span>
+        <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
             size="icon-xs"
             aria-label="New document"
             title="New document"
-            onClick={() => void handleNewDocument()}
+            onClick={handleNewDocument}
           >
             <PlusIcon />
           </Button>
@@ -115,32 +143,33 @@ export function DocumentTree({
         </div>
       </div>
 
-      {folders.length === 0 && documents.length === 0 ? (
-        <p className="rounded-lg px-2 py-6 text-center text-xs text-muted-foreground">
-          No documents yet. Use the + buttons above to create one.
-        </p>
-      ) : (
-        <nav aria-label="Documents" className="flex flex-col gap-0.5">
-          {folders.map((folder) => (
-            <FolderNode
-              key={folder.id}
-              folder={folder}
-              documents={documents.filter((doc) => doc.folderId === folder.id)}
-              activePath={pathname}
-              onRename={() => setFolderDialogFor(folder)}
-              onDelete={() => setPendingFolderDelete(folder)}
-            />
-          ))}
-          {rootDocuments.map((doc) => (
-            <DocumentNode
-              key={doc.id}
-              document={doc}
-              folders={folders}
-              active={pathname === `/app/doc/${doc.id}`}
-            />
-          ))}
-        </nav>
-      )}
+      <SidebarMenu>
+        {folders.map((folder) => (
+          <FolderNode
+            key={folder.id}
+            folder={folder}
+            documents={documents.filter((doc) => doc.folderId === folder.id)}
+            activePath={pathname}
+            onRename={() => setFolderDialogFor(folder)}
+            onDelete={() => setPendingFolderDelete(folder)}
+          />
+        ))}
+        {rootDocuments.map((doc) => (
+          <DocumentNode
+            key={doc.id}
+            document={doc}
+            folders={folders}
+            active={pathname === `/app/doc/${doc.id}`}
+          />
+        ))}
+        {folders.length === 0 && documents.length === 0 ? (
+          <li className="px-2 py-6 text-center text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+            No documents yet.
+            <br />
+            Use + above to create one.
+          </li>
+        ) : null}
+      </SidebarMenu>
 
       <NameDialog
         key={folderDialogFor === "new" ? "new" : (folderDialogFor?.id ?? "closed")}
@@ -171,7 +200,9 @@ export function DocumentTree({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{pendingFolderDelete?.name}”?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete “{pendingFolderDelete?.name}”?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Documents inside this folder stay in the workspace root.
             </AlertDialogDescription>
@@ -182,9 +213,10 @@ export function DocumentTree({
               onClick={() =>
                 void (async () => {
                   if (!pendingFolderDelete) return;
-                  const result = await deleteFolderAction(pendingFolderDelete.id);
-                  if (!result.ok) toast.error(result.error);
-                  else router.refresh();
+                  await runTreeAction(
+                    deleteFolderAction(pendingFolderDelete.id),
+                    router,
+                  );
                   setPendingFolderDelete(null);
                 })()
               }
@@ -194,7 +226,7 @@ export function DocumentTree({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </SidebarGroup>
   );
 }
 
@@ -211,32 +243,57 @@ function FolderNode({
   onRename: () => void;
   onDelete: () => void;
 }) {
+  const hasActiveDoc = documents.some(
+    (doc) => activePath === `/app/doc/${doc.id}`,
+  );
+
   return (
-    <details className="group/folder">
-      <summary className="flex cursor-default list-none items-center gap-1.5 rounded-md px-1.5 py-1 text-sm hover:bg-sidebar-accent [&::-webkit-details-marker]:hidden">
-        <FolderIcon className="size-3.5 shrink-0 text-muted-foreground group-open/folder:hidden" />
-        <FolderOpenIcon className="hidden size-3.5 shrink-0 text-muted-foreground group-open/folder:block" />
-        <span className="truncate font-medium">{folder.name}</span>
-        <FolderMenu
-          folder={folder}
-          onRename={onRename}
-          onDelete={onDelete}
-        />
-      </summary>
-      <div className="ml-3 flex flex-col gap-0.5 border-l pl-1.5">
-        {documents.map((doc) => (
-          <DocumentNode
-            key={doc.id}
-            document={doc}
-            folders={[folder]}
-            active={activePath === `/app/doc/${doc.id}`}
-          />
-        ))}
-        {documents.length === 0 ? (
-          <p className="px-1.5 py-1 text-xs text-muted-foreground">Empty</p>
-        ) : null}
-      </div>
-    </details>
+    // Base UI composition: Collapsible renders the <li> itself.
+    <Collapsible
+      defaultOpen
+      className="group/collapsible"
+      render={<SidebarMenuItem />}
+    >
+      <CollapsibleTrigger render={<SidebarMenuButton tooltip={folder.name} />}>
+        {hasActiveDoc ? <FolderOpenIcon /> : <FolderIcon />}
+        <span className="truncate">{folder.name}</span>
+      </CollapsibleTrigger>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<SidebarMenuAction aria-label={`Actions for ${folder.name}`} />}
+        >
+          <MoreHorizontalIcon />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="right" className="w-40">
+          <DropdownMenuItem onClick={onRename}>
+            <PencilIcon />
+            Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            <Trash2Icon />
+            Delete folder
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <CollapsibleContent>
+        <SidebarMenuSub>
+          {documents.map((doc) => (
+            <SidebarMenuSubItem key={doc.id}>
+              <SidebarMenuSubButton
+                render={<Link href={`/app/doc/${doc.id}`} />}
+                isActive={activePath === `/app/doc/${doc.id}`}
+              >
+                <span className="truncate">{doc.title}</span>
+              </SidebarMenuSubButton>
+              <DocumentActionsMenu document={doc} folders={[folder]} />
+            </SidebarMenuSubItem>
+          ))}
+          {documents.length === 0 ? (
+            <li className="px-2 py-1 text-xs text-muted-foreground">Empty</li>
+          ) : null}
+        </SidebarMenuSub>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -249,122 +306,90 @@ function DocumentNode({
   folders: TreeFolder[];
   active: boolean;
 }) {
-  const router = useRouter();
-
-  async function runAction(action: () => Promise<{ ok: true } | { ok: false; error: string }>) {
-    const result = await action();
-    if (!result.ok) toast.error(result.error);
-    else router.refresh();
-  }
-
   return (
-    <div
-      className={cn(
-        "group/doc flex min-w-0 items-center rounded-md hover:bg-sidebar-accent",
-        active && "bg-sidebar-accent",
-      )}
-    >
-      <Link
-        href={`/app/doc/${document.id}`}
-        className={cn(
-          "flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-none",
-          active && "font-medium text-sidebar-accent-foreground",
-        )}
-      >
-        <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" />
+    <SidebarMenuItem>
+      <SidebarMenuButton render={<Link href={`/app/doc/${document.id}`} />} isActive={active} tooltip={document.title}>
+        <FileTextIcon />
         <span className="truncate">{document.title}</span>
-      </Link>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              aria-label={`Actions for ${document.title}`}
-              className="opacity-0 transition-opacity group-hover/doc:opacity-100 focus-visible:opacity-100"
-            />
-          }
-        >
-          <MoreHorizontalIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" side="right" className="w-44">
-          <DropdownMenuItem
-            onSelect={() => void runAction(() => duplicateDocumentAction(document.id))}
-          >
-            <CopyIcon />
-            Duplicate
-          </DropdownMenuItem>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <FolderIcon />
-              Move to folder
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-44">
-              <DropdownMenuItem
-                onSelect={() =>
-                  void runAction(() => moveDocumentAction(document.id, null))
-                }
-              >
-                Workspace root
-              </DropdownMenuItem>
-              {folders.map((folder) => (
-                <DropdownMenuItem
-                  key={folder.id}
-                  onSelect={() =>
-                    void runAction(() => moveDocumentAction(document.id, folder.id))
-                  }
-                >
-                  {folder.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={() =>
-              void runAction(() => deleteDocumentAction(document.id))
-            }
-          >
-            <Trash2Icon />
-            Delete document
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+      </SidebarMenuButton>
+      <DocumentActionsMenu document={document} folders={folders} />
+    </SidebarMenuItem>
   );
 }
 
-function FolderMenu({
-  folder,
-  onRename,
-  onDelete,
+function DocumentActionsMenu({
+  document,
+  folders,
 }: {
-  folder: TreeFolder;
-  onRename: () => void;
-  onDelete: () => void;
+  document: TreeDocument;
+  folders: TreeFolder[];
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Actions for ${folder.name}`}
-            className="ml-auto opacity-0 transition-opacity group-hover/folder:opacity-100 focus-visible:opacity-100"
-          />
+          <SidebarMenuAction aria-label={`Actions for ${document.title}`} />
         }
       >
         <MoreHorizontalIcon />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="right" className="w-40">
-        <DropdownMenuItem onSelect={onRename}>
-          <PencilIcon />
-          Rename
+      <DropdownMenuContent align="start" side="right" className="w-44">
+        <DropdownMenuItem
+          onClick={() =>
+            void runTreeAction(duplicateDocumentAction(document.id), router)
+          }
+        >
+          <CopyIcon />
+          Duplicate
         </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <FolderIcon />
+            Move to folder
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-44">
+            <DropdownMenuItem
+              onClick={() =>
+                void runTreeAction(moveDocumentAction(document.id, null), router)
+              }
+            >
+              Workspace root
+            </DropdownMenuItem>
+            {folders.map((folder) => (
+              <DropdownMenuItem
+                key={folder.id}
+                onClick={() =>
+                  void runTreeAction(moveDocumentAction(document.id, folder.id), router)
+                }
+              >
+                {folder.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() =>
+            void (async () => {
+              const result = await deleteDocumentAction(document.id);
+              if (!result.ok) {
+                toast.error(result.error);
+                return;
+              }
+              // Leave the deleted document's page if we were on it.
+              if (pathname === `/app/doc/${document.id}`) {
+                router.push("/app");
+              }
+              router.refresh();
+            })()
+          }
+        >
           <Trash2Icon />
-          Delete folder
+          Delete document
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -386,9 +411,7 @@ function NameDialog({
   initialName: string;
   submitLabel: string;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (
-    name: string,
-  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  onSubmit: (name: string) => Promise<ActionResult>;
 }) {
   const [name, setName] = useState(initialName);
   const [pending, setPending] = useState(false);
