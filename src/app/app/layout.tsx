@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { AppShell } from "@/features/workspace/app-shell";
 import { db } from "@/db";
 import { auth } from "@/lib/auth/server";
+import { listWorkspaceTree } from "@/lib/documents/server";
 import { createDefaultWorkspace, getUserWorkspaces } from "@/lib/workspaces/server";
 
 export default async function AppLayout({
@@ -21,6 +22,9 @@ export default async function AppLayout({
     workspaces = await getUserWorkspaces(session.user.id);
   }
 
+  const activeWorkspace = workspaces[0];
+  const tree = await listWorkspaceTree(session.user.id, activeWorkspace.id);
+
   return (
     <AppShell
       user={{
@@ -29,6 +33,8 @@ export default async function AppLayout({
         image: session.user.image ?? null,
       }}
       workspaces={workspaces}
+      folders={tree.folders}
+      documents={tree.documents}
     >
       {children}
     </AppShell>

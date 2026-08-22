@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronsUpDownIcon, FileTextIcon, LogOutIcon, PanelLeftIcon } from "lucide-react";
+import { ChevronsUpDownIcon, LogOutIcon, PanelLeftIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -8,13 +8,6 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth/client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,6 +18,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  DocumentTree,
+  type TreeDocument,
+  type TreeFolder,
+} from "@/features/workspace/document-tree";
 
 type WorkspaceSummary = {
   id: string;
@@ -42,10 +40,14 @@ type ShellUser = {
 export function AppShell({
   user,
   workspaces,
+  folders,
+  documents,
   children,
 }: {
   user: ShellUser;
   workspaces: WorkspaceSummary[];
+  folders: TreeFolder[];
+  documents: TreeDocument[];
   children: React.ReactNode;
 }) {
   const activeWorkspace = workspaces[0];
@@ -115,23 +117,8 @@ export function AppShell({
             </Button>
           </div>
 
-          {/* Document tree — populated in Phase 2 */}
-          <div className="flex flex-1 flex-col overflow-y-auto px-2 pb-2">
-            <p className="px-1.5 py-1.5 text-xs font-medium text-muted-foreground">
-              Documents
-            </p>
-            <Empty className="rounded-lg border">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <FileTextIcon />
-                </EmptyMedia>
-                <EmptyTitle>No documents yet</EmptyTitle>
-                <EmptyDescription>
-                  Documents will appear here once the editor ships.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          </div>
+          {/* Document tree */}
+          <DocumentTree folders={folders} documents={documents} />
 
           {/* User controls */}
           <div className="flex items-center gap-1 border-t p-2">
