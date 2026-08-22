@@ -9,6 +9,9 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
+  // BETTER_AUTH_URL sets the canonical origin (production). In development the
+  // app and the E2E suite run on different ports, so trust both explicitly.
+  trustedOrigins: ["http://localhost:3000", "http://localhost:3100"],
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
