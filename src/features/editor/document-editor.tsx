@@ -72,6 +72,7 @@ export function DocumentEditor({
     ],
     content: initialDocument.contentMd,
     contentType: "markdown",
+    immediatelyRender: false,
     editorProps: {
       attributes: {
         class: "tiptap-prose min-h-full outline-none",

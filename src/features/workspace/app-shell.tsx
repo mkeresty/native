@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -83,6 +84,7 @@ export function AppShell({
                   <Button
                     variant="ghost"
                     className="h-9 min-w-0 flex-1 justify-start px-1.5"
+                    aria-label="Switch workspace"
                   />
                 }
               >
@@ -93,18 +95,20 @@ export function AppShell({
                 <ChevronsUpDownIcon className="ml-auto opacity-60" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {workspaces.map((workspace) => (
-                  <DropdownMenuItem key={workspace.id}>
-                    <span className="truncate">{workspace.name}</span>
-                    {workspace.id === activeWorkspace.id ? (
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        Current
-                      </span>
-                    ) : null}
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {workspaces.map((workspace) => (
+                    <DropdownMenuItem key={workspace.id}>
+                      <span className="truncate">{workspace.name}</span>
+                      {workspace.id === activeWorkspace.id ? (
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          Current
+                        </span>
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button
@@ -187,7 +191,9 @@ function UserMenu({ user }: { user: ShellUser }) {
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" className="w-56">
-        <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={handleSignOut}>
           <LogOutIcon />
