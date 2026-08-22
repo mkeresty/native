@@ -172,3 +172,100 @@
     @apply font-sans;
   }
 }
+
+/* Editor content typography — token-driven, mirrors rendered Markdown. */
+.tiptap-prose {
+  @apply text-editor-foreground;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.tiptap-prose > * + * {
+  margin-top: 0.75em;
+}
+
+.tiptap-prose h1,
+.tiptap-prose h2,
+.tiptap-prose h3,
+.tiptap-prose h4 {
+  @apply font-semibold tracking-tight text-editor-foreground;
+  line-height: 1.3;
+  margin-top: 1.6em;
+}
+
+.tiptap-prose h1 {
+  font-size: 1.9rem;
+}
+.tiptap-prose h2 {
+  font-size: 1.5rem;
+}
+.tiptap-prose h3 {
+  font-size: 1.25rem;
+}
+.tiptap-prose h4 {
+  font-size: 1.05rem;
+}
+
+.tiptap-prose ul,
+.tiptap-prose ol {
+  @apply pl-6;
+}
+.tiptap-prose ul {
+  list-style: disc;
+}
+.tiptap-prose ol {
+  list-style: decimal;
+}
+.tiptap-prose li > p {
+  margin-top: 0;
+}
+.tiptap-prose li > ul,
+.tiptap-prose li > ol {
+  margin-top: 0.25em;
+}
+
+/* Task lists */
+.tiptap-prose ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25rem;
+}
+.tiptap-prose ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.tiptap-prose ul[data-type="taskList"] li > label {
+  margin-top: 0.25em;
+  flex-shrink: 0;
+  user-select: none;
+}
+.tiptap-prose ul[data-type="taskList"] li[data-checked="true"] > div {
+  @apply text-muted-foreground line-through;
+}
+
+.tiptap-prose blockquote {
+  @apply border-l-2 border-border pl-4 text-muted-foreground italic;
+}
+
+.tiptap-prose code {
+  @apply rounded-md bg-code-background px-1.5 py-0.5 font-mono text-[0.875em] text-code-foreground;
+}
+
+.tiptap-prose pre {
+  @apply overflow-x-auto rounded-lg bg-code-background p-4 font-mono text-sm text-code-foreground;
+}
+.tiptap-prose pre code {
+  @apply bg-transparent p-0 text-inherit;
+}
+
+.tiptap-prose a {
+  @apply underline decoration-border underline-offset-2 hover:decoration-foreground;
+}
+
+.tiptap-prose hr {
+  @apply my-6 border-border;
+}
+
+.tiptap-prose ::selection {
+  background-color: var(--editor-selection);
+}
