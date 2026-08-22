@@ -9,6 +9,7 @@ import {
   BoldIcon,
   CheckIcon,
   CodeIcon,
+  FileCodeIcon,
   Heading2Icon,
   Heading3Icon,
   ItalicIcon,
@@ -16,6 +17,7 @@ import {
   ListIcon,
   ListOrderedIcon,
   ListTodoIcon,
+  PilcrowIcon,
   QuoteIcon,
   StrikethroughIcon,
   MinusIcon,
@@ -31,6 +33,10 @@ import {
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
 const SAVE_DEBOUNCE_MS = 900;
@@ -45,6 +51,8 @@ export function DocumentEditor({
   const [title, setTitle] = useState(initialDocument.title);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [viewMode, setViewMode] = useState<"rich" | "markdown">("rich");
+  const [markdownDraft, setMarkdownDraft] = useState(initialDocument.contentMd);
 
   const latestRef = useRef({
     documentId: initialDocument.id,
@@ -80,7 +88,11 @@ export function DocumentEditor({
       },
     },
     onUpdate: ({ editor }) => {
-      latestRef.current.contentMd = editor.getMarkdown();
+      const md = editor.getMarkdown();
+      // Transactions fire for selection-only changes and programmatic updates;
+      // only real content differences count as edits.
+      if (md === latestRef.current.contentMd) return;
+      latestRef.current.contentMd = md;
       latestRef.current.dirty = true;
       setStatus("dirty");
     },
@@ -133,9 +145,30 @@ export function DocumentEditor({
     setStatus("dirty");
   }, []);
 
-  const markDirtyContent = useCallback(() => {
+  function switchViewMode(mode: "rich" | "markdown") {
+    if (mode === viewMode) return;
+    if (!editor) {
+      setViewMode(mode);
+      return;
+    }
+    if (mode === "markdown") {
+      setMarkdownDraft(latestRef.current.contentMd);
+      setViewMode(mode);
+      return;
+    }
+    // Back to rich text: parse the edited markdown into the editor.
+    editor.commands.setContent(markdownDraft, { contentType: "markdown" });
+    setMarkdownDraft(editor.getMarkdown());
+    setViewMode(mode);
+  }
+
+  function handleMarkdownChange(value: string) {
+    setMarkdownDraft(value);
+    if (value === latestRef.current.contentMd) return;
+    latestRef.current.contentMd = value;
+    latestRef.current.dirty = true;
     setStatus("dirty");
-  }, []);
+  }
 
   // ⌘/Ctrl+S flushes the pending save.
   useEffect(() => {
@@ -175,23 +208,60 @@ export function DocumentEditor({
         />
         <div className="flex items-center justify-between gap-3">
           <SaveStatusIndicator status={status} savedAt={savedAt} />
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={() => void handleExport()}>
+          <div className="flex items-center gap-2">
+            <ToggleGroup
+              value={[viewMode]}
+              onValueChange={(values) =>
+                switchViewMode((values[0] as "rich" | "markdown") ?? "rich")
+              }
+              aria-label="Editing view"
+              variant="outline"
+            >
+              <ToggleGroupItem value="rich" aria-label="Rich text view" title="Rich text view">
+                <PilcrowIcon />
+                Write
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="markdown"
+                aria-label="Markdown source view"
+                title="Markdown source view"
+              >
+                <FileCodeIcon />
+                Markdown
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleExport()}
+              title="Download this document as a .md file (⌘S saves first)"
+            >
               Export .md
             </Button>
           </div>
         </div>
       </header>
 
-      {editor ? (
+      {editor && viewMode === "rich" ? (
         <>
           <Toolbar editor={editor} />
           <div className="min-h-0 flex-1 overflow-y-auto bg-editor-background px-6 py-8">
             <div className="mx-auto w-full max-w-3xl">
-              <EditorContent editor={editor} onBlur={markDirtyContent} />
+              <EditorContent editor={editor} />
             </div>
           </div>
         </>
+      ) : editor ? (
+        <div className="min-h-0 flex-1 overflow-y-auto bg-editor-background px-6 py-8">
+          <textarea
+            value={markdownDraft}
+            onChange={(event) => handleMarkdownChange(event.target.value)}
+            onBlur={() => void flushSave()}
+            aria-label="Document markdown source"
+            spellCheck={false}
+            className="mx-auto block min-h-full w-full max-w-3xl resize-none rounded-lg border border-border bg-code-background p-5 font-mono text-sm leading-relaxed text-code-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          />
+        </div>
       ) : (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
           Loading editor…
@@ -301,14 +371,14 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
         <ItalicIcon />
       </ToolbarButton>
       <ToolbarButton
-        label="Strikethrough"
+        label="Strikethrough (⌘⇧S)"
         active={state.strike}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       >
         <StrikethroughIcon />
       </ToolbarButton>
       <ToolbarButton
-        label="Inline code"
+        label="Inline code (⌘E)"
         active={state.code}
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
@@ -339,14 +409,14 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       <Separator orientation="vertical" className="mx-1 !h-4" />
 
       <ToolbarButton
-        label="Bullet list"
+        label="Bullet list (⌘⇧8)"
         active={state.bulletList}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
       >
         <ListIcon />
       </ToolbarButton>
       <ToolbarButton
-        label="Numbered list"
+        label="Numbered list (⌘⇧7)"
         active={state.orderedList}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       >
