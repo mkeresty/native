@@ -22,6 +22,15 @@
   --color-editor-selection: var(--editor-selection);
   --color-code-background: var(--code-background);
   --color-code-foreground: var(--code-foreground);
+  --color-syntax-marker: var(--syntax-marker);
+  --color-syntax-heading: var(--syntax-heading);
+  --color-syntax-link: var(--syntax-link);
+  --color-syntax-code: var(--syntax-code);
+  --color-code-comment: var(--code-comment);
+  --color-code-keyword: var(--code-keyword);
+  --color-code-string: var(--code-string);
+  --color-code-number: var(--code-number);
+  --color-code-function: var(--code-function);
   --color-presence-1: var(--presence-1);
   --color-presence-2: var(--presence-2);
   --color-presence-3: var(--presence-3);
@@ -110,6 +119,17 @@
   --editor-selection: oklch(0.52 0.09 255 / 16%);
   --code-background: oklch(0.95 0.014 90);
   --code-foreground: oklch(0.25 0.026 155);
+  /* Markdown source view. Colour only — see markdown-source.tsx. */
+  --syntax-marker: #9aa39a;
+  --syntax-heading: #2b3928;
+  --syntax-link: #4f7288;
+  --syntax-code: #87693f;
+  /* Code block highlighting, kept inside the warm editorial palette. */
+  --code-comment: #939c91;
+  --code-keyword: #8a5548;
+  --code-string: #5d7a4e;
+  --code-number: #4f7288;
+  --code-function: #7a6533;
   --status-online: #6fac69;
   --user-avatar: #d3ab84;
   --task-checkbox: #728b6c;
@@ -171,6 +191,15 @@
   --editor-selection: oklch(0.68 0.1 245 / 24%);
   --code-background: oklch(0.18 0.015 155);
   --code-foreground: oklch(0.88 0.02 105);
+  --syntax-marker: oklch(0.6 0.015 145);
+  --syntax-heading: oklch(0.91 0.03 120);
+  --syntax-link: oklch(0.74 0.07 240);
+  --syntax-code: oklch(0.79 0.07 80);
+  --code-comment: oklch(0.62 0.015 145);
+  --code-keyword: oklch(0.76 0.09 40);
+  --code-string: oklch(0.79 0.09 135);
+  --code-number: oklch(0.76 0.07 240);
+  --code-function: oklch(0.82 0.08 85);
   --status-online: oklch(0.72 0.12 145);
   --user-avatar: #d9ad7c;
   --task-checkbox: #8dae81;
@@ -281,13 +310,9 @@
   margin-top: 0.25em;
 }
 
-/* Task lists read as a checklist block, set off by a rule above. */
 .tiptap-prose ul[data-type="taskList"] {
   list-style: none;
   padding-left: 0;
-  border-top: 1px solid var(--border);
-  margin-top: 30px;
-  padding-top: 19px;
 }
 .tiptap-prose ul[data-type="taskList"] li {
   display: flex;
@@ -346,6 +371,57 @@
   @apply bg-transparent p-0 text-inherit;
 }
 
+/* highlight.js token classes, produced by lowlight decorations. Anything not
+   listed here inherits --code-foreground, which is the intent: colour the few
+   categories that aid scanning rather than every token. */
+.tiptap-prose pre .hljs-comment,
+.tiptap-prose pre .hljs-quote {
+  color: var(--code-comment);
+  font-style: italic;
+}
+.tiptap-prose pre .hljs-keyword,
+.tiptap-prose pre .hljs-selector-tag,
+.tiptap-prose pre .hljs-literal,
+.tiptap-prose pre .hljs-type,
+.tiptap-prose pre .hljs-tag,
+.tiptap-prose pre .hljs-name,
+.tiptap-prose pre .hljs-doctag {
+  color: var(--code-keyword);
+}
+.tiptap-prose pre .hljs-string,
+.tiptap-prose pre .hljs-regexp,
+.tiptap-prose pre .hljs-symbol,
+.tiptap-prose pre .hljs-selector-attr,
+.tiptap-prose pre .hljs-selector-pseudo,
+.tiptap-prose pre .hljs-addition {
+  color: var(--code-string);
+}
+.tiptap-prose pre .hljs-number,
+.tiptap-prose pre .hljs-built_in,
+.tiptap-prose pre .hljs-class,
+.tiptap-prose pre .hljs-variable.language_,
+.tiptap-prose pre .hljs-meta {
+  color: var(--code-number);
+}
+.tiptap-prose pre .hljs-title,
+.tiptap-prose pre .hljs-title.function_,
+.tiptap-prose pre .hljs-title.class_,
+.tiptap-prose pre .hljs-attr,
+.tiptap-prose pre .hljs-attribute,
+.tiptap-prose pre .hljs-property,
+.tiptap-prose pre .hljs-section {
+  color: var(--code-function);
+}
+.tiptap-prose pre .hljs-emphasis {
+  font-style: italic;
+}
+.tiptap-prose pre .hljs-strong {
+  font-weight: 600;
+}
+.tiptap-prose pre .hljs-deletion {
+  color: var(--destructive);
+}
+
 .tiptap-prose a {
   @apply underline decoration-border underline-offset-2 hover:decoration-foreground;
 }
@@ -356,6 +432,20 @@
 
 .tiptap-prose ::selection {
   background-color: var(--editor-selection);
+}
+
+.markdown-source-input::selection {
+  background-color: var(--editor-selection);
+}
+
+/* Used by scroll containers whose scrollbar would be visual noise — the
+   sidebar and the horizontally scrolling editor toolbar. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 .document-topbar {

@@ -9,25 +9,54 @@ import {
   BoldIcon,
   CheckIcon,
   CodeIcon,
+  CopyIcon,
   FileCodeIcon,
+  HashIcon,
+  Heading1Icon,
   Heading2Icon,
   Heading3Icon,
+  Heading4Icon,
+  HeadingIcon,
   ItalicIcon,
   Link2Icon,
   ListIcon,
   ListOrderedIcon,
   ListTodoIcon,
   QuoteIcon,
+  SquareCodeIcon,
   StrikethroughIcon,
   MinusIcon,
   Share2Icon,
   DownloadIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { saveDocumentAction } from "@/features/documents/actions";
+import {
+  MarkdownSource,
+  type MarkdownSourceHandle,
+} from "@/features/editor/markdown-source";
+import {
+  insertBlock,
+  insertLink,
+  setHeading,
+  toggleFence,
+  toggleLinePrefix,
+  toggleOrderedList,
+  toggleWrap,
+} from "@/features/editor/markdown-commands";
+import { looksLikeMarkdown } from "@/features/editor/markdown-highlight";
+import { CodeBlockWithLanguage } from "@/features/editor/code-block-view";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarGroup } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
@@ -46,6 +75,40 @@ import {
 } from "@/lib/utils/time";
 
 const SAVE_DEBOUNCE_MS = 900;
+
+/**
+ * Turns a multi-block selection into ONE code block holding the joined lines.
+ * Tiptap's toggleCodeBlock uses setBlockType, which would convert each
+ * paragraph into its own separate fence instead.
+ */
+function collapseIntoCodeBlock(editor: NonNullable<ReturnType<typeof useEditor>>) {
+  const { from, to } = editor.state.selection;
+  const text = editor.state.doc.textBetween(from, to, "\n");
+  editor
+    .chain()
+    .focus()
+    .deleteSelection()
+    .insertContent({
+      type: "codeBlock",
+      content: text ? [{ type: "text", text }] : [],
+    })
+    .run();
+}
+
+/** A new list marker replaces a competing one rather than stacking onto it. */
+const LIST_PREFIX = /^(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/;
+
+type FormatCommand =
+  | "bold"
+  | "italic"
+  | "strike"
+  | "code"
+  | "codeBlock"
+  | "bullet"
+  | "ordered"
+  | "task"
+  | "quote"
+  | "divider";
 
 type SaveStatus = "saved" | "dirty" | "saving" | "error";
 
@@ -67,10 +130,21 @@ export function DocumentEditor({
   const [viewMode, setViewMode] = useState<"write" | "read">("write");
   const [isSourceMode, setIsSourceMode] = useState(false);
   const [markdownDraft, setMarkdownDraft] = useState(initialDocument.contentMd);
+  const [showLineNumbers, setShowLineNumbers] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const sourceRef = useRef<MarkdownSourceHandle | null>(null);
+  // handlePaste is defined while the editor is being created, so it reaches the
+  // instance through a ref rather than the (not yet assigned) local.
+  const editorRef = useRef<ReturnType<typeof useEditor> | null>(null);
   // 0 = top of document, 1 = title fully compacted.
   const [scrollProgress, setScrollProgress] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // onUpdate closes over the editor config, so it reads the mode from a ref.
+  const isSourceModeRef = useRef(false);
+  useEffect(() => {
+    isSourceModeRef.current = isSourceMode;
+  }, [isSourceMode]);
 
   const latestRef = useRef({
     documentId: initialDocument.id,
@@ -82,6 +156,8 @@ export function DocumentEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
+        // Replaced below with a variant that renders its own language picker.
+        codeBlock: false,
         heading: { levels: [1, 2, 3, 4] },
         link: {
           openOnClick: false,
@@ -90,6 +166,7 @@ export function DocumentEditor({
           HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
         },
       }),
+      CodeBlockWithLanguage,
       TaskList,
       TaskItem.configure({ nested: true }),
       Markdown.configure({
@@ -104,8 +181,39 @@ export function DocumentEditor({
         class: "tiptap-prose min-h-full outline-none",
         "aria-label": "Document content",
       },
+      /**
+       * Plain-text Markdown pasted from an editor or terminal arrives with no
+       * HTML flavour, so ProseMirror drops it in verbatim and only the paste
+       * rules (bold, autolink) fire — a half-converted mess. Parse it instead.
+       */
+      handlePaste: (view, event) => {
+        const clipboard = event.clipboardData;
+        if (!clipboard) return false;
+        // A rich source supplied real HTML; let ProseMirror handle it.
+        if (clipboard.types.includes("text/html")) return false;
+
+        const text = clipboard.getData("text/plain");
+        if (!text || !looksLikeMarkdown(text)) return false;
+
+        // Inside a code block the markup is the content.
+        const { $from } = view.state.selection;
+        for (let depth = $from.depth; depth > 0; depth -= 1) {
+          if ($from.node(depth).type.name === "codeBlock") return false;
+        }
+
+        const active = editorRef.current;
+        if (!active) return false;
+
+        event.preventDefault();
+        active.commands.insertContent(text, { contentType: "markdown" });
+        return true;
+      },
     },
     onUpdate: ({ editor }) => {
+      // While the source view is open the textarea owns the document. The
+      // editor still holds whatever it had on entering source mode, so letting
+      // its updates through here would overwrite the draft with stale content.
+      if (isSourceModeRef.current) return;
       const md = editor.getMarkdown();
       // Transactions fire for selection-only changes and programmatic updates;
       // only real content differences count as edits.
@@ -116,25 +224,35 @@ export function DocumentEditor({
     },
   });
 
+  useEffect(() => {
+    editorRef.current = editor ?? null;
+  }, [editor]);
+
   const flushSave = useCallback(async () => {
-    const state = latestRef.current;
-    if (!state.dirty) return;
+    if (!latestRef.current.dirty) return;
+    // Copy the fields by value. Holding onto latestRef.current would alias the
+    // live object, so the post-save comparison below would compare it with
+    // itself and always report "nothing changed".
+    const snapshot = {
+      documentId: latestRef.current.documentId,
+      title: latestRef.current.title,
+      contentMd: latestRef.current.contentMd,
+    };
     setStatus("saving");
     try {
-      const result = await saveDocumentAction({
-        documentId: state.documentId,
-        title: state.title,
-        contentMd: state.contentMd,
-      });
+      const result = await saveDocumentAction(snapshot);
       if (!result.ok) throw new Error(result.error);
-      // Only clear dirty if nothing changed while saving.
       if (
-        latestRef.current.title === state.title &&
-        latestRef.current.contentMd === state.contentMd
+        latestRef.current.title === snapshot.title &&
+        latestRef.current.contentMd === snapshot.contentMd
       ) {
         latestRef.current.dirty = false;
         setStatus("saved");
         setSavedAt(new Date());
+      } else {
+        // The document moved on while the request was in flight; re-arm the
+        // debounce so the newer content still reaches the server.
+        setStatus("dirty");
       }
     } catch {
       setStatus("error");
@@ -188,6 +306,139 @@ export function DocumentEditor({
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [editor, viewMode, isSourceMode]);
+
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(copiedTimer.current), []);
+
+  const handleCopyAll = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(latestRef.current.contentMd);
+      setCopied(true);
+      clearTimeout(copiedTimer.current);
+      copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Could not copy to the clipboard.");
+    }
+  }, []);
+
+  /**
+   * One toolbar, two targets. In source mode the commands rewrite raw Markdown
+   * in the textarea; otherwise they run through the rich-text editor.
+   */
+  const runFormatCommand = useCallback(
+    (command: FormatCommand) => {
+      if (isSourceMode) {
+        const source = sourceRef.current;
+        if (!source) return;
+        switch (command) {
+          case "bold":
+            return source.apply((v, s, e) => toggleWrap(v, s, e, "**"));
+          case "italic":
+            return source.apply((v, s, e) => toggleWrap(v, s, e, "*"));
+          case "strike":
+            return source.apply((v, s, e) => toggleWrap(v, s, e, "~~"));
+          case "code":
+            // A run spanning lines cannot be an inline span, so it becomes a
+            // fence — matching what the rich editor does with the same click.
+            return source.apply((v, s, e) =>
+              v.slice(s, e).includes("\n")
+                ? toggleFence(v, s, e)
+                : toggleWrap(v, s, e, "`"),
+            );
+          case "codeBlock":
+            return source.apply((v, s, e) => toggleFence(v, s, e));
+          case "bullet":
+            return source.apply((v, s, e) =>
+              toggleLinePrefix(v, s, e, "- ", LIST_PREFIX),
+            );
+          case "ordered":
+            return source.apply(toggleOrderedList);
+          case "task":
+            return source.apply((v, s, e) =>
+              toggleLinePrefix(v, s, e, "- [ ] ", LIST_PREFIX),
+            );
+          case "quote":
+            return source.apply((v, s, e) => toggleLinePrefix(v, s, e, "> "));
+          case "divider":
+            return source.apply((v, s, e) => insertBlock(v, s, e, "---"));
+        }
+      }
+
+      if (!editor) return;
+      const chain = editor.chain().focus();
+      switch (command) {
+        case "bold":
+          return chain.toggleBold().run();
+        case "italic":
+          return chain.toggleItalic().run();
+        case "strike":
+          return chain.toggleStrike().run();
+        case "code": {
+          // The code mark cannot cross block boundaries, so a selection
+          // spanning blocks becomes a code block. Count textblocks rather than
+          // comparing parents: a select-all yields an AllSelection whose ends
+          // both resolve to the doc node, which would look like one block.
+          const { from, to } = editor.state.selection;
+          let blocks = 0;
+          editor.state.doc.nodesBetween(from, to, (node) => {
+            if (node.isTextblock) blocks += 1;
+          });
+          if (editor.isActive("codeBlock")) return chain.toggleCodeBlock().run();
+          if (blocks > 1) return collapseIntoCodeBlock(editor);
+          return chain.toggleCode().run();
+        }
+        case "codeBlock": {
+          if (editor.isActive("codeBlock")) return chain.toggleCodeBlock().run();
+          const { from, to } = editor.state.selection;
+          let count = 0;
+          editor.state.doc.nodesBetween(from, to, (node) => {
+            if (node.isTextblock) count += 1;
+          });
+          if (count > 1) return collapseIntoCodeBlock(editor);
+          return chain.toggleCodeBlock().run();
+        }
+        case "bullet":
+          return chain.toggleBulletList().run();
+        case "ordered":
+          return chain.toggleOrderedList().run();
+        case "task":
+          return chain.toggleTaskList().run();
+        case "quote":
+          return chain.toggleBlockquote().run();
+        case "divider":
+          return chain.setHorizontalRule().run();
+      }
+    },
+    [editor, isSourceMode],
+  );
+
+  const applyHeading = useCallback(
+    (level: number) => {
+      if (isSourceMode) {
+        sourceRef.current?.apply((v, s, e) => setHeading(v, s, e, level));
+        return;
+      }
+      const chain = editor?.chain().focus();
+      if (!chain) return;
+      if (level === 0) chain.setParagraph().run();
+      else chain.setHeading({ level: level as 1 | 2 | 3 | 4 }).run();
+    },
+    [editor, isSourceMode],
+  );
+
+  const applyLink = useCallback(
+    (href: string) => {
+      if (isSourceMode) {
+        sourceRef.current?.apply((v, s, e) => insertLink(v, s, e, href));
+        return;
+      }
+      const chain = editor?.chain().focus().extendMarkRange("link");
+      if (!chain) return;
+      if (href.trim() === "") chain.unsetLink().run();
+      else chain.setLink({ href: href.trim() }).run();
+    },
+    [editor, isSourceMode],
+  );
 
   const markDirtyTitle = useCallback((value: string) => {
     setTitle(value);
@@ -361,17 +612,23 @@ export function DocumentEditor({
                 editor={editor}
                 isSourceMode={isSourceMode}
                 onToggleSourceMode={toggleSourceMode}
+                showLineNumbers={showLineNumbers}
+                onToggleLineNumbers={() => setShowLineNumbers((on) => !on)}
+                onCommand={runFormatCommand}
+                onSetHeading={applyHeading}
+                onApplyLink={applyLink}
+                copied={copied}
+                onCopyAll={() => void handleCopyAll()}
                 isStuck={isToolbarStuck}
                 className="sticky top-0 z-10 mb-[34px]"
               />
               {isSourceMode ? (
-                <textarea
+                <MarkdownSource
                   value={markdownDraft}
-                  onChange={(event) => handleMarkdownChange(event.target.value)}
+                  onChange={handleMarkdownChange}
                   onBlur={() => void flushSave()}
-                  aria-label="Document markdown source"
-                  spellCheck={false}
-                  className="block min-h-140 w-full resize-none border-0 bg-code-background p-6 font-mono text-sm leading-7 text-code-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  showLineNumbers={showLineNumbers}
+                  handleRef={sourceRef}
                 />
               ) : (
                 <div className="max-w-[650px]">
@@ -483,12 +740,26 @@ function Toolbar({
   editor,
   isSourceMode,
   onToggleSourceMode,
+  showLineNumbers,
+  onToggleLineNumbers,
+  onCommand,
+  onSetHeading,
+  onApplyLink,
+  copied,
+  onCopyAll,
   isStuck,
   className,
 }: {
   editor: ReturnType<typeof useEditor>;
   isSourceMode: boolean;
   onToggleSourceMode: () => void;
+  showLineNumbers: boolean;
+  onToggleLineNumbers: () => void;
+  onCommand: (command: FormatCommand) => void;
+  onSetHeading: (level: number) => void;
+  onApplyLink: (href: string) => void;
+  copied: boolean;
+  onCopyAll: () => void;
   isStuck?: boolean;
   className?: string;
 }) {
@@ -501,8 +772,10 @@ function Toolbar({
         italic: editor.isActive("italic"),
         strike: editor.isActive("strike"),
         code: editor.isActive("code"),
-        h2: editor.isActive("heading", { level: 2 }),
-        h3: editor.isActive("heading", { level: 3 }),
+        codeBlock: editor.isActive("codeBlock"),
+        headingLevel: ([1, 2, 3, 4] as const).find((level) =>
+          editor.isActive("heading", { level }),
+        ) ?? 0,
         bulletList: editor.isActive("bulletList"),
         orderedList: editor.isActive("orderedList"),
         taskList: editor.isActive("taskList"),
@@ -515,104 +788,107 @@ function Toolbar({
 
   return (
     <div
+      data-toolbar=""
       className={cn(
         // Flat rule rather than a floating pill; the background only exists so
         // scrolled content does not show through while the bar is stuck.
         "flex items-center gap-1 border-b bg-editor-background py-[13px]",
+        // Too many controls to fit a phone, so the row scrolls sideways rather
+        // than wrapping or pushing the page wider. Both menus are portalled,
+        // so the overflow container does not clip them.
+        "no-scrollbar overflow-x-auto",
         isStuck && "shadow-[0_6px_12px_-10px_var(--toolbar-border)]",
         className,
       )}
     >
       <ToolbarButton
         label="Bold (⌘B)"
-        active={state.bold}
-        onClick={() => editor.chain().focus().toggleBold().run()}
+        active={!isSourceMode && state.bold}
+        onClick={() => onCommand("bold")}
       >
         <BoldIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Italic (⌘I)"
-        active={state.italic}
-        onClick={() => editor.chain().focus().toggleItalic().run()}
+        active={!isSourceMode && state.italic}
+        onClick={() => onCommand("italic")}
       >
         <ItalicIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Strikethrough (⌘⇧S)"
-        active={state.strike}
-        onClick={() => editor.chain().focus().toggleStrike().run()}
+        active={!isSourceMode && state.strike}
+        onClick={() => onCommand("strike")}
       >
         <StrikethroughIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Inline code (⌘E)"
-        active={state.code}
-        onClick={() => editor.chain().focus().toggleCode().run()}
+        active={!isSourceMode && state.code}
+        onClick={() => onCommand("code")}
       >
         <CodeIcon />
       </ToolbarButton>
-
-      <Separator orientation="vertical" className="mx-[5px] !h-[25px] !self-center" />
-
       <ToolbarButton
-        label="Heading 2"
-        active={state.h2}
-        onClick={() =>
-          editor.chain().focus().toggleHeading({ level: 2 }).run()
-        }
+        label="Code block"
+        active={!isSourceMode && state.codeBlock}
+        onClick={() => onCommand("codeBlock")}
       >
-        <Heading2Icon />
-      </ToolbarButton>
-      <ToolbarButton
-        label="Heading 3"
-        active={state.h3}
-        onClick={() =>
-          editor.chain().focus().toggleHeading({ level: 3 }).run()
-        }
-      >
-        <Heading3Icon />
+        <SquareCodeIcon />
       </ToolbarButton>
 
-      <Separator orientation="vertical" className="mx-[5px] !h-[25px] !self-center" />
+      <Separator orientation="vertical" className="mx-[5px] !h-[25px] shrink-0 !self-center" />
+
+      <HeadingMenu
+        level={isSourceMode ? 0 : state.headingLevel}
+        showActive={!isSourceMode}
+        onSelect={onSetHeading}
+      />
+
+      <Separator orientation="vertical" className="mx-[5px] !h-[25px] shrink-0 !self-center" />
 
       <ToolbarButton
         label="Bullet list (⌘⇧8)"
-        active={state.bulletList}
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        active={!isSourceMode && state.bulletList}
+        onClick={() => onCommand("bullet")}
       >
         <ListIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Numbered list (⌘⇧7)"
-        active={state.orderedList}
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        active={!isSourceMode && state.orderedList}
+        onClick={() => onCommand("ordered")}
       >
         <ListOrderedIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Checklist"
-        active={state.taskList}
-        onClick={() => editor.chain().focus().toggleTaskList().run()}
+        active={!isSourceMode && state.taskList}
+        onClick={() => onCommand("task")}
       >
         <ListTodoIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Quote"
-        active={state.blockquote}
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        active={!isSourceMode && state.blockquote}
+        onClick={() => onCommand("quote")}
       >
         <QuoteIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Divider"
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+        onClick={() => onCommand("divider")}
       >
         <MinusIcon />
       </ToolbarButton>
 
-      <LinkPopover active={state.link} editor={editor} />
+      <LinkPopover
+        active={!isSourceMode && state.link}
+        currentHref={isSourceMode ? "" : (editor?.getAttributes("link").href ?? "")}
+        onApply={onApplyLink}
+      />
 
-      <Separator orientation="vertical" className="mx-[5px] !h-[25px] !self-center" />
+      <Separator orientation="vertical" className="mx-[5px] !h-[25px] shrink-0 !self-center" />
 
       <ToolbarButton
         label="Markdown source"
@@ -621,36 +897,104 @@ function Toolbar({
       >
         <FileCodeIcon />
       </ToolbarButton>
+      {/* Line numbers only mean anything while the source is showing. */}
+      {isSourceMode ? (
+        <ToolbarButton
+          label="Line numbers"
+          active={showLineNumbers}
+          onClick={onToggleLineNumbers}
+        >
+          <HashIcon />
+        </ToolbarButton>
+      ) : null}
+      <ToolbarButton
+        label={copied ? "Copied" : "Copy all text"}
+        onClick={onCopyAll}
+      >
+        {copied ? <CheckIcon /> : <CopyIcon />}
+      </ToolbarButton>
     </div>
+  );
+}
+
+const HEADING_ICONS = [
+  HeadingIcon,
+  Heading1Icon,
+  Heading2Icon,
+  Heading3Icon,
+  Heading4Icon,
+] as const;
+
+/**
+ * One control for every heading level: the trigger shows the level in play,
+ * and the menu offers the rest. Replaces a row of per-level buttons that only
+ * ever covered two of the four levels the schema allows.
+ */
+function HeadingMenu({
+  level,
+  showActive,
+  onSelect,
+}: {
+  level: number;
+  showActive: boolean;
+  onSelect: (level: number) => void;
+}) {
+  const Icon = HEADING_ICONS[level] ?? HeadingIcon;
+  const active = showActive && level > 0;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Heading level"
+            title="Heading level"
+            className={cn(
+              "size-[27px] min-w-[27px] rounded-md text-editor-foreground hover:bg-secondary [&_svg:not([class*='size-'])]:size-[15px]",
+              active && "bg-secondary text-foreground",
+            )}
+          />
+        }
+      >
+        <Icon />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-40">
+        <DropdownMenuRadioGroup
+          value={String(level)}
+          onValueChange={(value) => onSelect(Number(value))}
+        >
+          <DropdownMenuRadioItem value="0">Body text</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="1">Heading 1</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="2">Heading 2</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="3">Heading 3</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="4">Heading 4</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 function LinkPopover({
   active,
-  editor,
+  currentHref,
+  onApply,
 }: {
   active: boolean;
-  editor: NonNullable<ReturnType<typeof useEditor>>;
+  currentHref: string;
+  onApply: (href: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
 
   function openWithCurrent() {
-    setUrl(editor.getAttributes("link").href ?? "");
+    setUrl(currentHref);
     setOpen(true);
   }
 
   function apply() {
-    if (url.trim() === "") {
-      editor.chain().focus().extendMarkRange("link").unsetLink().run();
-    } else {
-      editor
-        .chain()
-        .focus()
-        .extendMarkRange("link")
-        .setLink({ href: url.trim() })
-        .run();
-    }
+    onApply(url.trim());
     setOpen(false);
   }
 
