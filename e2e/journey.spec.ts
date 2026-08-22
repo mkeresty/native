@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { test as pageErrorTest } from "./fixtures";
 
 const unique = Date.now();
 
@@ -14,6 +15,30 @@ async function signUp(page: Page): Promise<string> {
 }
 
 test.describe("critical user journey", () => {
+  pageErrorTest("app shell has no uncaught runtime errors", async ({ page }) => {
+    await signUp(page);
+    // Interact with the menus that previously threw MenuGroupContext errors.
+    // Menus mount asynchronously, so every step asserts on the live popup.
+    const accountTrigger = page.getByRole("button", { name: /Account:/ });
+    const accountMenu = page.getByRole("menu", { name: /Account:/ });
+
+    await accountTrigger.click();
+    const menuEmail = page
+      .locator("[data-slot=dropdown-menu-content]")
+      .filter({ hasText: /@example\.com/ });
+    await expect(menuEmail).toBeVisible();
+
+    await accountTrigger.click();
+    await expect(accountMenu).toBeHidden();
+
+    const workspaceMenu = page
+      .locator("[data-slot=dropdown-menu-content]")
+      .filter({ hasText: "Workspaces" });
+    await page.getByRole("button", { name: "Switch workspace" }).click();
+    await expect(workspaceMenu).toBeVisible();
+    await expect(workspaceMenu).toContainText("Current");
+  });
+
   test("sign in → create document → edit → reload → persists", async ({
     page,
   }) => {
