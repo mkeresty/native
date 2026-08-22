@@ -26,7 +26,14 @@ export default async function DocumentPage({ params }: PageProps) {
 
   return (
     <DocumentEditor
-      document={{ id: doc.id, title: doc.title, contentMd: doc.contentMd }}
+      document={{
+        id: doc.id,
+        title: doc.title,
+        contentMd: doc.contentMd,
+        folderName: doc.folderName,
+        authorName: doc.authorName,
+        updatedAt: doc.updatedAt,
+      }}
     />
   );
 }

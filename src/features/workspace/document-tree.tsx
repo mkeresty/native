@@ -116,10 +116,10 @@ export function DocumentTree({
   }
 
   return (
-    <SidebarGroup>
+    <SidebarGroup className="px-4 py-3 group-data-[collapsible=icon]:px-2">
       <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:hidden">
-        <span className="text-xs font-medium text-sidebar-foreground/70">
-          Documents
+        <span className="text-sm font-medium tracking-[0.18em] text-sidebar-foreground/70">
+          Collections
         </span>
         <div className="flex items-center gap-0.5">
           <Button
@@ -134,8 +134,8 @@ export function DocumentTree({
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label="New folder"
-            title="New folder"
+            aria-label="New collection"
+            title="New collection"
             onClick={() => setFolderDialogFor("new")}
           >
             <FolderPlusIcon />
@@ -174,9 +174,11 @@ export function DocumentTree({
       <NameDialog
         key={folderDialogFor === "new" ? "new" : (folderDialogFor?.id ?? "closed")}
         open={folderDialogFor !== null}
-        title={folderDialogFor === "new" ? "New folder" : "Rename folder"}
+        title={folderDialogFor === "new" ? "New collection" : "Rename collection"}
         description={
-          folderDialogFor === "new" ? "Folders group related documents." : undefined
+          folderDialogFor === "new"
+            ? "Collections group related documents."
+            : undefined
         }
         initialName={
           folderDialogFor && folderDialogFor !== "new" ? folderDialogFor.name : ""
@@ -204,7 +206,7 @@ export function DocumentTree({
               Delete “{pendingFolderDelete?.name}”?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Documents inside this folder stay in the workspace root.
+              Documents inside this collection stay in the workspace root.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -221,7 +223,7 @@ export function DocumentTree({
                 })()
               }
             >
-              Delete folder
+              Delete collection
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -271,7 +273,7 @@ function FolderNode({
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={onDelete}>
             <Trash2Icon />
-            Delete folder
+            Delete collection
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -348,7 +350,7 @@ function DocumentActionsMenu({
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <FolderIcon />
-            Move to folder
+            Move to collection
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-44">
             <DropdownMenuItem

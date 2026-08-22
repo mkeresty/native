@@ -64,28 +64,36 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
+    <SidebarProvider style={{ "--sidebar-width": "18rem" } as React.CSSProperties}>
       <SidebarKeyboardToggle />
       <Sidebar collapsible="icon">
-        <SidebarHeader>
+        <SidebarHeader className="px-4 pt-5 pb-3 group-data-[collapsible=icon]:px-2">
           <WorkspaceSwitcher workspaces={workspaces} />
         </SidebarHeader>
         <SidebarContent>
           <DocumentTree folders={folders} documents={documents} />
         </SidebarContent>
-        <SidebarFooter>
-          <div className="flex items-center gap-1">
-            <UserMenu user={user} />
+        <SidebarFooter className="mx-4 border-t border-sidebar-border px-0 pt-4 pb-4 group-data-[collapsible=icon]:mx-2">
+          <div className="flex items-center gap-1 group-data-[collapsible=icon]:justify-center">
+            <div className="group-data-[collapsible=icon]:hidden">
+              <UserMenu user={user} />
+            </div>
             <ThemeToggle />
           </div>
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
-      <SidebarInset>
-        <div className="flex h-svh min-h-svh flex-col">
-          <header className="flex h-9 shrink-0 items-center gap-1 border-b px-1.5">
-            <SidebarTrigger aria-label="Toggle sidebar (⌘\)" title="Toggle sidebar (⌘\)" />
-          </header>
+      <SidebarInset className="bg-workspace">
+        <div className="relative flex h-svh min-h-svh flex-col">
+          {/* Wrapper owns the centering transform; the button keeps its own
+              press animation without fighting translate utilities. */}
+          <div className="absolute top-1/2 left-0 z-20 -translate-x-1/2 -translate-y-1/2">
+            <SidebarTrigger
+              aria-label="Toggle sidebar (⌘\)"
+              title="Toggle sidebar (⌘\)"
+              className="rounded-full border border-border bg-editor-background shadow-sm"
+            />
+          </div>
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
         </div>
       </SidebarInset>
@@ -119,11 +127,11 @@ function WorkspaceSwitcher({ workspaces }: { workspaces: WorkspaceSummary[] }) {
       <DropdownMenuTrigger
         render={<SidebarMenuButton size="lg" aria-label="Switch workspace" />}
       >
-        <span className="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
-          {activeWorkspace.name.slice(0, 1).toUpperCase()}
+        <span className="flex aspect-square size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary font-heading text-xl font-semibold text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8">
+          A
         </span>
-        <span className="truncate font-medium">{activeWorkspace.name}</span>
-        <ChevronsUpDownIcon className="ml-auto opacity-60" />
+        <span className="truncate font-heading text-lg font-semibold tracking-tight group-data-[collapsible=icon]:hidden">atelier</span>
+        <ChevronsUpDownIcon className="ml-auto opacity-60 group-data-[collapsible=icon]:hidden" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="bottom" className="w-56">
         <DropdownMenuGroup>
@@ -185,7 +193,9 @@ function UserMenu({ user }: { user: ShellUser }) {
         />
         <Avatar className={isPending ? "hidden" : ""}>
           {user.image ? <AvatarImage src={user.image} alt="" /> : null}
-          <AvatarFallback>{initials(user.name)}</AvatarFallback>
+          <AvatarFallback className="bg-user-avatar text-sidebar-primary-foreground">
+            {initials(user.name)}
+          </AvatarFallback>
         </Avatar>
         <span className="truncate text-sm font-medium">{user.name}</span>
       </DropdownMenuTrigger>

@@ -75,12 +75,12 @@ test.describe("critical user journey", () => {
     await expect(sidebar(page)).toContainText("Changelog");
 
     // Markdown source view shows and edits the canonical document.
-    await page.getByRole("button", { name: "Markdown source view" }).click();
+    await page.getByRole("button", { name: "Markdown source" }).click();
     const source = page.getByLabel("Document markdown source");
     await expect(source).toHaveValue(/# Release notes/);
     await source.fill("# Renamed heading\n\nStill **bold**.\n");
     await expect(page.getByText(/Saved \d/)).toBeVisible({ timeout: 10_000 });
-    await page.getByRole("button", { name: "Rich text view" }).click();
+    await page.getByRole("button", { name: "Markdown source" }).click();
     await expect(editor.locator("h1")).toHaveText("Renamed heading");
 
     // Sanity: markdown export contains canonical markdown.
@@ -97,12 +97,31 @@ test.describe("critical user journey", () => {
     expect(page.url()).toContain(documentId);
   });
 
-  test("folders can be created and documents moved", async ({ page }) => {
+  test("collections can be created and documents moved", async ({ page }) => {
     await signUp(page);
-    await page.getByRole("button", { name: "New folder" }).click();
+    await page.getByRole("button", { name: "New collection" }).click();
     await page.getByLabel("Name").fill("Specs");
     await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
     await expect(sidebar(page)).toContainText("Specs");
+
+    // Move the flow: create a doc and file it under the collection.
+    await page.getByRole("button", { name: "New document" }).first().click();
+    await page.waitForURL(/\/app\/doc\//);
+    await page.getByLabel("Document title").fill("Filed doc");
+    await expect(page.getByText(/Saved \d/)).toBeVisible({ timeout: 10_000 });
+    await page.reload();
+
+    await page
+      .getByRole("button", { name: "Actions for Filed doc" })
+      .click({ force: true });
+    await page
+      .locator("[data-slot=dropdown-menu-content]")
+      .getByRole("menuitem", { name: "Move to collection" })
+      .click();
+    const specsFolder = sidebar(page).getByRole("button", { name: "Specs" });
+    await expect(specsFolder).toBeVisible();
+    await specsFolder.click();
+    await expect(sidebar(page)).toContainText("Filed doc");
   });
 
   test("documents can be deleted from the sidebar", async ({ page }) => {

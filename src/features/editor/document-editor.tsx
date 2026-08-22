@@ -10,6 +10,7 @@ import {
   CheckIcon,
   CodeIcon,
   FileCodeIcon,
+  FolderIcon,
   Heading2Icon,
   Heading3Icon,
   ItalicIcon,
@@ -17,15 +18,16 @@ import {
   ListIcon,
   ListOrderedIcon,
   ListTodoIcon,
-  PilcrowIcon,
   QuoteIcon,
   StrikethroughIcon,
   MinusIcon,
+  Share2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { saveDocumentAction } from "@/features/documents/actions";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarGroup } from "@/components/ui/avatar";
 import {
   Popover,
   PopoverContent,
@@ -38,6 +40,10 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import {
+  formatRelativeTime,
+  readingTimeMinutes,
+} from "@/lib/utils/time";
 
 const SAVE_DEBOUNCE_MS = 900;
 
@@ -46,13 +52,25 @@ type SaveStatus = "saved" | "dirty" | "saving" | "error";
 export function DocumentEditor({
   document: initialDocument,
 }: {
-  document: { id: string; title: string; contentMd: string };
+  document: {
+    id: string;
+    title: string;
+    contentMd: string;
+    folderName: string | null;
+    authorName: string;
+    updatedAt: Date;
+  };
 }) {
   const [title, setTitle] = useState(initialDocument.title);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
-  const [viewMode, setViewMode] = useState<"rich" | "markdown">("rich");
+  const [viewMode, setViewMode] = useState<"write" | "read">("write");
+  const [isSourceMode, setIsSourceMode] = useState(false);
   const [markdownDraft, setMarkdownDraft] = useState(initialDocument.contentMd);
+  // 0 = top of document, 1 = title fully compacted.
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const latestRef = useRef({
     documentId: initialDocument.id,
@@ -138,6 +156,39 @@ export function DocumentEditor({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
+  // Title compacts as the document scrolls (0 → 1 over ~140px).
+  const scrollRaf = useRef(0);
+
+  const handleScroll = useCallback(() => {
+    cancelAnimationFrame(scrollRaf.current);
+    scrollRaf.current = requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      setScrollProgress(Math.min(1, Math.max(0, el.scrollTop / 140)));
+    });
+  }, []);
+
+  useEffect(() => () => cancelAnimationFrame(scrollRaf.current), []);
+
+  const lastActivity = savedAt ?? initialDocument.updatedAt;
+  const readingTime = readingTimeMinutes(markdownDraft);
+
+  // The toolbar is "stuck" once its sentinel scrolls out of view.
+  const [isToolbarStuck, setIsToolbarStuck] = useState(false);
+  const toolbarSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const sentinel = toolbarSentinelRef.current;
+    const root = scrollRef.current;
+    if (!sentinel || !root) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsToolbarStuck(!entry.isIntersecting),
+      { root, threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [editor, viewMode, isSourceMode]);
+
   const markDirtyTitle = useCallback((value: string) => {
     setTitle(value);
     latestRef.current.title = value;
@@ -145,21 +196,35 @@ export function DocumentEditor({
     setStatus("dirty");
   }, []);
 
-  function switchViewMode(mode: "rich" | "markdown") {
-    if (mode === viewMode) return;
-    if (!editor) {
-      setViewMode(mode);
-      return;
-    }
-    if (mode === "markdown") {
-      setMarkdownDraft(latestRef.current.contentMd);
-      setViewMode(mode);
-      return;
-    }
-    // Back to rich text: parse the edited markdown into the editor.
+  useEffect(() => {
+    editor?.setEditable(viewMode === "write" && !isSourceMode);
+  }, [editor, isSourceMode, viewMode]);
+
+  function applyMarkdownSource() {
+    if (!editor) return;
     editor.commands.setContent(markdownDraft, { contentType: "markdown" });
-    setMarkdownDraft(editor.getMarkdown());
+    const normalizedMarkdown = editor.getMarkdown();
+    setMarkdownDraft(normalizedMarkdown);
+    latestRef.current.contentMd = normalizedMarkdown;
+  }
+
+  function switchViewMode(mode: "write" | "read") {
+    if (mode === viewMode) return;
+    if (isSourceMode) {
+      applyMarkdownSource();
+      setIsSourceMode(false);
+    }
     setViewMode(mode);
+  }
+
+  function toggleSourceMode() {
+    if (isSourceMode) {
+      applyMarkdownSource();
+      setIsSourceMode(false);
+      return;
+    }
+    setMarkdownDraft(latestRef.current.contentMd);
+    setIsSourceMode(true);
   }
 
   function handleMarkdownChange(value: string) {
@@ -182,92 +247,130 @@ export function DocumentEditor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [flushSave]);
 
-  async function handleExport() {
-    await flushSave();
-    const blob = new Blob([latestRef.current.contentMd], {
-      type: "text/markdown;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = window.document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${title.trim() || "untitled"}.md`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
-
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex flex-col gap-1 border-b px-6 pt-5 pb-3">
-        <input
-          value={title}
-          onChange={(event) => markDirtyTitle(event.target.value)}
-          onBlur={() => void flushSave()}
-          placeholder="Untitled"
-          aria-label="Document title"
-          className="w-full bg-transparent text-2xl font-semibold tracking-tight text-editor-foreground outline-none placeholder:text-muted-foreground/60"
-        />
-        <div className="flex items-center justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-col bg-workspace">
+      <header className="document-topbar flex h-20 shrink-0 items-center justify-between gap-4 border-b px-5 sm:px-8">
+        <div className="flex min-w-0 items-center gap-3 text-sm text-muted-foreground sm:text-base">
+          <FolderIcon className="shrink-0 text-sidebar-primary" />
+          <span className="max-w-32 leading-tight sm:max-w-44">
+            {initialDocument.folderName ?? "Workspace"}
+          </span>
+          <span aria-hidden className="text-lg">/</span>
+          <span className="truncate leading-tight">{title || "Untitled"}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
           <SaveStatusIndicator status={status} savedAt={savedAt} />
-          <div className="flex items-center gap-2">
-            <ToggleGroup
-              value={[viewMode]}
-              onValueChange={(values) =>
-                switchViewMode((values[0] as "rich" | "markdown") ?? "rich")
-              }
-              aria-label="Editing view"
-              variant="outline"
+          <Collaborators />
+          <Button variant="outline" size="default" className="hidden sm:inline-flex">
+            <Share2Icon data-icon="inline-start" />
+            Share
+          </Button>
+          <ToggleGroup
+            value={[viewMode]}
+            onValueChange={(values) =>
+              switchViewMode((values[0] as "write" | "read") ?? "write")
+            }
+            aria-label="Editing view"
+            spacing={2}
+          >
+            <ToggleGroupItem
+              value="write"
+              aria-label="Write mode"
+              title="Write mode"
+              className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
             >
-              <ToggleGroupItem value="rich" aria-label="Rich text view" title="Rich text view">
-                <PilcrowIcon />
-                Write
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="markdown"
-                aria-label="Markdown source view"
-                title="Markdown source view"
-              >
-                <FileCodeIcon />
-                Markdown
-              </ToggleGroupItem>
-            </ToggleGroup>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleExport()}
-              title="Download this document as a .md file (⌘S saves first)"
+              Write
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="read"
+              aria-label="Read mode"
+              title="Read mode"
+              className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
             >
-              Export .md
-            </Button>
-          </div>
+              Read
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
       </header>
 
-      {editor && viewMode === "rich" ? (
-        <>
-          <Toolbar editor={editor} />
-          <div className="min-h-0 flex-1 overflow-y-auto bg-editor-background px-6 py-8">
-            <div className="mx-auto w-full max-w-3xl">
-              <EditorContent editor={editor} />
-            </div>
-          </div>
-        </>
-      ) : editor ? (
-        <div className="min-h-0 flex-1 overflow-y-auto bg-editor-background px-6 py-8">
-          <textarea
-            value={markdownDraft}
-            onChange={(event) => handleMarkdownChange(event.target.value)}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="min-h-0 flex-1 overflow-y-auto bg-editor-background"
+      >
+        <div className="mx-auto w-full max-w-3xl px-6 pt-8 pb-16 sm:px-10">
+          <input
+            value={title}
+            onChange={(event) => markDirtyTitle(event.target.value)}
             onBlur={() => void flushSave()}
-            aria-label="Document markdown source"
-            spellCheck={false}
-            className="mx-auto block min-h-full w-full max-w-3xl resize-none rounded-lg border border-border bg-code-background p-5 font-mono text-sm leading-relaxed text-code-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            readOnly={viewMode === "read"}
+            placeholder="Untitled"
+            aria-label="Document title"
+            style={{ fontSize: `${2.75 - 0.95 * scrollProgress}rem` }}
+            className="mt-2 w-full bg-transparent font-heading leading-tight font-medium tracking-[-0.04em] text-editor-foreground outline-none transition-[font-size] duration-75 ease-out placeholder:text-muted-foreground/60"
           />
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:text-sm">
+            <span>{initialDocument.authorName}</span>
+            {readingTime ? (
+              <>
+                <span aria-hidden>·</span>
+                <span>{readingTime} min read</span>
+              </>
+            ) : null}
+            <span aria-hidden>·</span>
+            <span>Updated {formatRelativeTime(lastActivity)}</span>
+          </div>
+          {editor && viewMode === "write" ? (
+            <>
+              <div ref={toolbarSentinelRef} aria-hidden className="h-px" />
+              <Toolbar
+                editor={editor}
+                isSourceMode={isSourceMode}
+                onToggleSourceMode={toggleSourceMode}
+                isStuck={isToolbarStuck}
+                className="sticky top-2 z-10 mt-4 mb-6"
+              />
+              {isSourceMode ? (
+                <textarea
+                  value={markdownDraft}
+                  onChange={(event) => handleMarkdownChange(event.target.value)}
+                  onBlur={() => void flushSave()}
+                  aria-label="Document markdown source"
+                  spellCheck={false}
+                  className="block min-h-140 w-full resize-none border-0 bg-code-background p-6 font-mono text-sm leading-7 text-code-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                />
+              ) : (
+                <EditorContent editor={editor} />
+              )}
+            </>
+        ) : editor ? (
+            <EditorContent editor={editor} />
+        ) : (
+          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+            Loading editor…
+          </div>
+        )}
         </div>
-      ) : (
-        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          Loading editor…
-        </div>
-      )}
+      </div>
     </div>
+  );
+}
+
+function Collaborators() {
+  return (
+    <AvatarGroup aria-label="Ada, Jordan, and Priya are collaborating">
+      {[
+        ["AL", "bg-presence-1"],
+        ["JM", "bg-presence-2"],
+        ["PK", "bg-presence-3"],
+      ].map(([initials, color]) => (
+        <Avatar key={initials} className="size-7 border-2 border-card">
+          <AvatarFallback className={cn(color, "font-mono text-[10px] text-primary-foreground")}>
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+      ))}
+    </AvatarGroup>
   );
 }
 
@@ -297,7 +400,7 @@ function SaveStatusIndicator({
           status === "error"
             ? "bg-destructive"
             : status === "saved"
-              ? "bg-emerald-500 dark:bg-emerald-400"
+              ? "bg-status-online"
               : "bg-muted-foreground/50 animate-pulse",
         )}
       />
@@ -320,7 +423,7 @@ function ToolbarButton({
   return (
     <Button
       variant="ghost"
-      size="icon-sm"
+      size="icon-xs"
       aria-label={label}
       title={label}
       aria-pressed={active}
@@ -332,7 +435,19 @@ function ToolbarButton({
   );
 }
 
-function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+function Toolbar({
+  editor,
+  isSourceMode,
+  onToggleSourceMode,
+  isStuck,
+  className,
+}: {
+  editor: ReturnType<typeof useEditor>;
+  isSourceMode: boolean;
+  onToggleSourceMode: () => void;
+  isStuck?: boolean;
+  className?: string;
+}) {
   const state = useEditorState({
     editor,
     selector({ editor }) {
@@ -355,7 +470,13 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   if (!state) return null;
 
   return (
-    <div className="flex items-center gap-0.5 border-b bg-toolbar px-4 py-1.5">
+    <div
+      className={cn(
+        "flex items-center gap-1 rounded-xl border border-toolbar-border bg-toolbar px-2 py-1 shadow-xs backdrop-blur",
+        isStuck && "shadow-sm",
+        className,
+      )}
+    >
       <ToolbarButton
         label="Bold (⌘B)"
         active={state.bold}
@@ -385,7 +506,7 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
         <CodeIcon />
       </ToolbarButton>
 
-      <Separator orientation="vertical" className="mx-1 !h-4" />
+      <Separator orientation="vertical" className="mx-1.5 !h-4 !self-center opacity-70" />
 
       <ToolbarButton
         label="Heading 2"
@@ -406,7 +527,7 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
         <Heading3Icon />
       </ToolbarButton>
 
-      <Separator orientation="vertical" className="mx-1 !h-4" />
+      <Separator orientation="vertical" className="mx-1.5 !h-4 !self-center opacity-70" />
 
       <ToolbarButton
         label="Bullet list (⌘⇧8)"
@@ -444,6 +565,16 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       </ToolbarButton>
 
       <LinkPopover active={state.link} editor={editor} />
+
+      <Separator orientation="vertical" className="mx-1.5 !h-4 !self-center opacity-70" />
+
+      <ToolbarButton
+        label="Markdown source"
+        active={isSourceMode}
+        onClick={onToggleSourceMode}
+      >
+        <FileCodeIcon />
+      </ToolbarButton>
     </div>
   );
 }

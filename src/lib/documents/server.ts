@@ -1,7 +1,7 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { document, folder, workspaceMember } from "@/db/schema";
+import { document, folder, user, workspaceMember } from "@/db/schema";
 
 export type DocumentSummary = {
   id: string;
@@ -206,8 +206,12 @@ export async function getDocumentForUser(userId: string, documentId: string) {
       folderId: document.folderId,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
+      folderName: folder.name,
+      authorName: user.name,
     })
     .from(document)
+    .leftJoin(folder, eq(document.folderId, folder.id))
+    .innerJoin(user, eq(document.createdBy, user.id))
     .innerJoin(
       workspaceMember,
       and(
