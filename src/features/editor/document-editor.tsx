@@ -22,6 +22,7 @@ import {
   StrikethroughIcon,
   MinusIcon,
   Share2Icon,
+  DownloadIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -247,6 +248,19 @@ export function DocumentEditor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [flushSave]);
 
+  async function handleExport() {
+    await flushSave();
+    const blob = new Blob([latestRef.current.contentMd], {
+      type: "text/markdown;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = window.document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${title.trim() || "untitled"}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-workspace">
       <header className="document-topbar flex h-20 shrink-0 items-center justify-between gap-4 border-b px-5 sm:px-8">
@@ -261,6 +275,16 @@ export function DocumentEditor({
         <div className="flex shrink-0 items-center gap-2">
           <SaveStatusIndicator status={status} savedAt={savedAt} />
           <Collaborators />
+          <Button
+            variant="outline"
+            size="icon"
+            className="hidden sm:inline-flex"
+            aria-label="Export .md"
+            title="Download as Markdown (.md)"
+            onClick={() => void handleExport()}
+          >
+            <DownloadIcon />
+          </Button>
           <Button variant="outline" size="default" className="hidden sm:inline-flex">
             <Share2Icon data-icon="inline-start" />
             Share

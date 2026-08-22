@@ -6,6 +6,7 @@ import { useEffect, useTransition } from "react";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth/client";
+import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -74,8 +75,8 @@ export function AppShell({
           <DocumentTree folders={folders} documents={documents} />
         </SidebarContent>
         <SidebarFooter className="mx-4 border-t border-sidebar-border px-0 pt-4 pb-4 group-data-[collapsible=icon]:mx-2">
-          <div className="flex items-center gap-1 group-data-[collapsible=icon]:justify-center">
-            <div className="group-data-[collapsible=icon]:hidden">
+          <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+            <div className="min-w-0 flex-1">
               <UserMenu user={user} />
             </div>
             <ThemeToggle />
@@ -191,13 +192,13 @@ function UserMenu({ user }: { user: ShellUser }) {
           className={isPending ? "block" : "hidden"}
           aria-hidden={isPending ? undefined : true}
         />
-        <Avatar className={isPending ? "hidden" : ""}>
+        <Avatar className={cn("size-6", isPending && "hidden")}>
           {user.image ? <AvatarImage src={user.image} alt="" /> : null}
-          <AvatarFallback className="bg-user-avatar text-sidebar-primary-foreground">
+          <AvatarFallback className="bg-user-avatar font-mono text-[10px] text-sidebar-primary-foreground">
             {initials(user.name)}
           </AvatarFallback>
         </Avatar>
-        <span className="truncate text-sm font-medium">{user.name}</span>
+        <span className="truncate text-xs font-medium">{user.name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" className="w-56">
         <DropdownMenuGroup>

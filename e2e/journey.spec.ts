@@ -118,7 +118,10 @@ test.describe("critical user journey", () => {
       .locator("[data-slot=dropdown-menu-content]")
       .getByRole("menuitem", { name: "Move to collection" })
       .click();
-    const specsFolder = sidebar(page).getByRole("button", { name: "Specs" });
+    const specsFolder = sidebar(page).getByRole("button", {
+      name: "Specs",
+      exact: true,
+    });
     await expect(specsFolder).toBeVisible();
     await specsFolder.click();
     await expect(sidebar(page)).toContainText("Filed doc");
