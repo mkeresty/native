@@ -10,9 +10,11 @@ async function signUp(page: Page): Promise<string> {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("supersecret1");
   await page.getByRole("button", { name: "Create account" }).click();
-  await page.waitForURL("/app");
+  await page.waitForURL(/app$/);
   return email;
 }
+
+const sidebar = (page: Page) => page.locator('[data-slot="sidebar"]');
 
 test.describe("critical user journey", () => {
   pageErrorTest("app shell has no uncaught runtime errors", async ({ page }) => {
@@ -45,10 +47,9 @@ test.describe("critical user journey", () => {
     await signUp(page);
 
     // Create a document from the sidebar.
-    await page.getByRole("button", { name: "New document" }).click();
+    await page.getByRole("button", { name: "New document" }).first().click();
     await page.waitForURL(/\/app\/doc\//);
-    const url = page.url();
-    const documentId = url.split("/").pop()!;
+    const documentId = page.url().split("/").pop()!;
 
     // Type into the editor using markdown input rules.
     const editor = page.locator(".tiptap-prose");
@@ -71,9 +72,16 @@ test.describe("critical user journey", () => {
     await page.getByLabel("Document title").fill("Changelog");
     await expect(page.getByText(/Saved \d/)).toBeVisible({ timeout: 10_000 });
     await page.reload();
-    await expect(page.locator("nav[aria-label=Documents]")).toContainText(
-      "Changelog",
-    );
+    await expect(sidebar(page)).toContainText("Changelog");
+
+    // Markdown source view shows and edits the canonical document.
+    await page.getByRole("button", { name: "Markdown source view" }).click();
+    const source = page.getByLabel("Document markdown source");
+    await expect(source).toHaveValue(/# Release notes/);
+    await source.fill("# Renamed heading\n\nStill **bold**.\n");
+    await expect(page.getByText(/Saved \d/)).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Rich text view" }).click();
+    await expect(editor.locator("h1")).toHaveText("Renamed heading");
 
     // Sanity: markdown export contains canonical markdown.
     const download = page.waitForEvent("download");
@@ -82,8 +90,8 @@ test.describe("critical user journey", () => {
     const path = await file.path();
     const { readFile } = await import("node:fs/promises");
     const md = await readFile(path!, "utf8");
-    expect(md).toContain("# Release notes");
-    expect(md).toContain("**editor**");
+    expect(md).toContain("# Renamed heading");
+    expect(md).toContain("**bold**");
 
     // Document id stays stable across the session.
     expect(page.url()).toContain(documentId);
@@ -94,6 +102,52 @@ test.describe("critical user journey", () => {
     await page.getByRole("button", { name: "New folder" }).click();
     await page.getByLabel("Name").fill("Specs");
     await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
-    await expect(page.locator("nav[aria-label=Documents]")).toContainText("Specs");
+    await expect(sidebar(page)).toContainText("Specs");
   });
+
+  test("documents can be deleted from the sidebar", async ({ page }) => {
+    await signUp(page);
+    await page.getByRole("button", { name: "New document" }).first().click();
+    await page.waitForURL(/\/app\/doc\//);
+    await page.getByLabel("Document title").fill("Doomed doc");
+    await expect(page.getByText(/Saved \d/)).toBeVisible({ timeout: 10_000 });
+
+    // Sync the sidebar tree with the saved title.
+    await page.reload();
+
+    const itemMenu = page.getByRole("button", { name: "Actions for Doomed doc" });
+    await itemMenu.click({ force: true }); // action button reveals on hover
+    await page
+      .locator("[data-slot=dropdown-menu-content]")
+      .getByRole("menuitem", { name: "Delete document" })
+      .click();
+
+    // Navigates home; the document disappears from the tree.
+    await page.waitForURL(/\/app$/);
+    await expect(sidebar(page)).not.toContainText("Doomed doc");
+  });
+
+  pageErrorTest(
+    "sidebar collapses to an icon rail that stays usable",
+    async ({ page }) => {
+      await signUp(page);
+
+      await page.getByRole("button", { name: /Toggle sidebar/ }).click();
+      const collapsedSidebar = sidebar(page);
+      await expect(collapsedSidebar).toHaveAttribute("data-state", "collapsed");
+      // Controls remain visible as icons.
+      await expect(
+        collapsedSidebar.getByRole("button", { name: "Switch workspace" }),
+      ).toBeVisible();
+      await expect(
+        collapsedSidebar.getByRole("button", { name: /Account:/ }),
+      ).toBeVisible();
+
+      // Re-expand via the rail trigger.
+      await page.getByRole("button", { name: /Toggle sidebar/ }).click();
+      await expect(
+        collapsedSidebar.getByRole("button", { name: "New document" }).first(),
+      ).toBeVisible();
+    },
+  );
 });
