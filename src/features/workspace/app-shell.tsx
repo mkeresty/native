@@ -197,7 +197,7 @@ function UserMenu({ user }: { user: ShellUser }) {
             size="lg"
             aria-label={`Account: ${user.name}`}
             disabled={isPending}
-            className="h-auto gap-2 rounded-lg px-0 py-0 text-xs hover:bg-transparent active:bg-transparent group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!"
+            className="h-auto gap-2 rounded-lg px-0 py-0 text-xs hover:bg-transparent active:bg-transparent group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
           />
         }
       >
@@ -205,9 +205,14 @@ function UserMenu({ user }: { user: ShellUser }) {
           className={cn("size-4", isPending ? "block" : "hidden")}
           aria-hidden={isPending ? undefined : true}
         />
-        <Avatar className={cn("size-[25px]", isPending && "hidden")}>
+        <Avatar
+          className={cn(
+            "size-[25px] group-data-[collapsible=icon]:size-8",
+            isPending && "hidden",
+          )}
+        >
           {user.image ? <AvatarImage src={user.image} alt="" /> : null}
-          <AvatarFallback className="bg-user-avatar text-[10px] font-extrabold text-sidebar-primary-foreground">
+          <AvatarFallback className="bg-user-avatar text-[10px] font-extrabold text-sidebar-primary-foreground group-data-[collapsible=icon]:text-[11px]">
             {initials(user.name)}
           </AvatarFallback>
         </Avatar>
