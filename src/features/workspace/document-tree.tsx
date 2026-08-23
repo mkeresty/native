@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -160,6 +160,16 @@ export function DocumentTree({
   >(null);
   const [pendingFolderDelete, setPendingFolderDelete] =
     useState<PendingFolderDelete>(null);
+
+  // The command palette and ⌘⌥C open this dialog from anywhere in the shell.
+  useEffect(() => {
+    function onNewCollection() {
+      setFolderDialogFor("new");
+    }
+    window.addEventListener("native:new-collection", onNewCollection);
+    return () =>
+      window.removeEventListener("native:new-collection", onNewCollection);
+  }, []);
 
   const rootDocuments = documents.filter((doc) => doc.folderId === null);
 

@@ -33,6 +33,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { saveDocumentAction } from "@/features/documents/actions";
+import { useFocusMode } from "@/features/workspace/ui-state";
 import {
   MarkdownSource,
   type MarkdownSourceHandle,
@@ -124,6 +125,7 @@ export function DocumentEditor({
     updatedAt: Date;
   };
 }) {
+  const { focused } = useFocusMode();
   const [title, setTitle] = useState(initialDocument.title);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -513,7 +515,9 @@ export function DocumentEditor({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-workspace">
-      {/* Left padding reserves the gutter for the shell's sidebar toggle. */}
+      {/* Left padding reserves the gutter for the shell's sidebar toggle.
+          Hidden entirely in focus mode — the document is the only chrome. */}
+      {!focused ? (
       <header className="document-topbar flex h-[57px] shrink-0 items-center justify-between gap-[18px] border-b pr-5 pl-[55px] text-xs text-editor-muted-foreground sm:pr-7 sm:pl-[63px]">
         <div className="flex min-w-0 items-center gap-2">
           <span className="max-w-32 leading-tight sm:max-w-44">
@@ -570,6 +574,7 @@ export function DocumentEditor({
           </ToggleGroup>
         </div>
       </header>
+      ) : null}
 
       <div
         ref={scrollRef}

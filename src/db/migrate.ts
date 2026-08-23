@@ -2,16 +2,15 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-const url = process.env.DATABASE_URL;
-if (!url) {
-  console.error("DATABASE_URL is required.");
-  process.exit(1);
-}
+/** Applies every pending migration in ./drizzle, then closes the connection. */
+export async function runMigrations(url = process.env.DATABASE_URL): Promise<void> {
+  if (!url) throw new Error("DATABASE_URL is required.");
 
-const conn = postgres(url, { prepare: false, max: 1 });
-try {
-  await migrate(drizzle(conn), { migrationsFolder: "./drizzle" });
-  console.log("Migrations applied successfully.");
-} finally {
-  await conn.end();
+  // onnotice keeps "already exists, skipping" chatter out of deploy logs.
+  const conn = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
+  try {
+    await migrate(drizzle(conn), { migrationsFolder: "./drizzle" });
+  } finally {
+    await conn.end();
+  }
 }
