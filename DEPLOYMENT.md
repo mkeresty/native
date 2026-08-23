@@ -15,19 +15,27 @@ Target: **Vercel** (app) + **Neon** (Postgres). Total cost at MVP scale: ~$0.
 1. **Neon**: create a project → copy the pooled connection string.
 2. **Vercel**: import the repository; framework preset Next.js, build command
    `bun run build` (or default).
-3. Set environment variables in Vercel (Production and Preview):
+3. Set environment variables in Vercel:
 
-   ```text
-   DATABASE_URL=<neon pooled connection string>
-   BETTER_AUTH_SECRET=<openssl rand -base64 32>
-   BETTER_AUTH_URL=https://your-production-domain
-   ```
+   | Variable | Production | Preview |
+   | --- | --- | --- |
+   | `DATABASE_URL` | Neon pooled connection string | Neon **branch** connection string |
+   | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` | same or separate |
+   | `BETTER_AUTH_URL` | `https://your-production-domain` | **leave unset** |
+   | `RUN_MIGRATIONS_ON_PREVIEW` | — | `1`, only if Preview has its own branch |
 
-4. Apply migrations to production once:
+   `BETTER_AUTH_URL` is deliberately production-only. Preview deployments get a
+   generated hostname, so a single fixed value would point auth callbacks and
+   cookies at the wrong origin; previews resolve their own origin from
+   `VERCEL_URL` instead (`src/lib/auth/base-url.ts`).
+
+4. Apply migrations to production once, before the first deploy:
 
    ```bash
    DATABASE_URL="<neon prod url>" bun run db:migrate
    ```
+
+   Subsequent migrations are applied automatically — see below.
 
 ## CI/CD
 
@@ -44,8 +52,29 @@ Rules of the pipeline:
 
 - PRs get a Vercel preview deployment automatically (Vercel GitHub integration).
 - Merge to `main` only when CI is green; Vercel deploys `main` to production.
-- Migrations are applied explicitly with `bun run db:migrate` against the target
-  database. For automated deploys, run it as a release step before traffic shifts.
+
+### Migrations on deploy
+
+Deploys are automatic, so migrations are too — otherwise merging a PR that adds
+a migration ships code expecting a column that does not exist yet.
+
+The `vercel-build` script runs `scripts/deploy-migrate.ts` before `next build`.
+Vercel only shifts traffic once the build succeeds, so a failed migration aborts
+the deployment rather than serving code against an unmigrated schema.
+
+| Environment | Migrates? |
+| --- | --- |
+| Production (`VERCEL_ENV=production`) | yes |
+| Preview | only with `RUN_MIGRATIONS_ON_PREVIEW=1` |
+| Local `bun run build`, CI | no — `DATABASE_URL` absent or non-Vercel |
+
+Previews are opt-in on purpose: a preview backed by a Neon branch wants its
+migrations, but one that inherited the production connection string must never
+migrate production as a side effect of opening a pull request. Set the flag only
+once Preview has its own database branch.
+
+If Vercel does not pick up `vercel-build` automatically, set the project's Build
+Command to `bun run vercel-build` explicitly.
 
 ## Migration policy
 
