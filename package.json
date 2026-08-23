@@ -8,6 +8,7 @@
     "vercel-build": "bun scripts/deploy-migrate.ts && next build",
     "start": "next start",
     "lint": "eslint .",
+    "typegen": "next typegen",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
