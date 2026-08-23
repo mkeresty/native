@@ -1,13 +1,21 @@
 "use client";
 
-import { ChevronsUpDownIcon, CommandIcon, LogOutIcon } from "lucide-react";
+import { ChevronsUpDownIcon, LogOutIcon, SearchIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useEffect, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -39,6 +47,16 @@ import {
   type TreeDocument,
   type TreeFolder,
 } from "@/features/workspace/document-tree";
+import {
+  CommandPaletteProvider,
+  useCommandPalette,
+} from "@/features/command-palette/command-palette-provider";
+import { CommandPalette } from "@/features/command-palette/command-palette";
+import { ShortcutsHelpDialog } from "@/features/command-palette/shortcuts-help-dialog";
+import { FocusModeProvider, useFocusMode } from "@/features/workspace/ui-state";
+import { createDocumentAction } from "@/features/documents/actions";
+import { formatShortcut } from "@/lib/shortcuts/registry";
+import { useGlobalShortcuts } from "@/lib/shortcuts/use-shortcuts";
 
 type WorkspaceSummary = {
   id: string;
@@ -53,7 +71,23 @@ type ShellUser = {
   image: string | null;
 };
 
-export function AppShell({
+export function AppShell(props: {
+  user: ShellUser;
+  workspaces: WorkspaceSummary[];
+  folders: TreeFolder[];
+  documents: TreeDocument[];
+  children: React.ReactNode;
+}) {
+  return (
+    <FocusModeProvider>
+      <CommandPaletteProvider>
+        <ShellInner {...props} />
+      </CommandPaletteProvider>
+    </FocusModeProvider>
+  );
+}
+
+function ShellInner({
   user,
   workspaces,
   folders,
@@ -66,9 +100,15 @@ export function AppShell({
   documents: TreeDocument[];
   children: React.ReactNode;
 }) {
+  const { focused } = useFocusMode();
+  const [helpOpen, setHelpOpen] = useState(false);
+
   return (
-    <SidebarProvider style={{ "--sidebar-width": "14.75rem" } as React.CSSProperties}>
-      <SidebarKeyboardToggle />
+    <SidebarProvider
+      style={{ "--sidebar-width": "14.75rem" } as React.CSSProperties}
+    >
+      <AppShortcuts onShowHelp={() => setHelpOpen(true)} />
+      <FocusModeSidebarSync />
       <Sidebar collapsible="icon">
         <SidebarHeader className="px-[14px] pt-5 pb-0 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pt-4">
           <WorkspaceSwitcher workspaces={workspaces} />
@@ -76,11 +116,15 @@ export function AppShell({
         <SidebarContent>
           <DocumentTree folders={folders} documents={documents} />
         </SidebarContent>
-        {/* Anchored to the bottom of the sidebar, below a full-width rule —
-            the navigation keeps whatever vertical space is left over. */}
+        {/* Anchored to the bottom of the sidebar — the quick-menu hint sits
+            just above the rule, the profile below it. The navigation keeps
+            whatever vertical space is left over. */}
         <SidebarFooter className="mt-auto gap-0 p-0 pb-5 group-data-[collapsible=icon]:pb-4">
+          <div className="px-[22px] pb-2.5 group-data-[collapsible=icon]:px-2">
+            <QuickMenuHint />
+          </div>
           <div className="mx-[14px] h-px bg-sidebar-border group-data-[collapsible=icon]:mx-2" />
-          <div className="px-[22px] pt-4 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pt-4">
+          <div className="pt-4 px-[22px] group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pt-4">
             <UserMenu user={user} />
           </div>
         </SidebarFooter>
@@ -90,37 +134,142 @@ export function AppShell({
         <div className="relative flex h-svh min-h-svh flex-col">
           {/* Lives in the shell rather than the document top bar so every page
               under /app has it. Positioned to land in the 57px top bar's left
-              gutter — which the bar reserves via its extra left padding. */}
-          <div className="absolute top-[15px] left-5 z-20 sm:left-7">
-            <SidebarTrigger
-              aria-label="Toggle sidebar (⌘\)"
-              title="Toggle sidebar (⌘\)"
-              className="size-[27px] rounded-md text-editor-muted-foreground hover:bg-secondary hover:text-foreground"
-            />
-          </div>
+              gutter — which the bar reserves via its extra left padding.
+              Hidden in focus mode so the document is the only thing on screen. */}
+          {!focused ? (
+            <div className="absolute top-[15px] left-5 z-20 sm:left-7">
+              <SidebarTrigger
+                aria-label={"Toggle sidebar (⌘\\)"}
+                title={"Toggle sidebar (⌘\\)"}
+                className="size-[27px] rounded-md text-editor-muted-foreground hover:bg-secondary hover:text-foreground"
+              />
+            </div>
+          ) : null}
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
         </div>
+        {focused ? <ExitFocusButton /> : null}
       </SidebarInset>
+      <CommandPalette documents={documents} />
+      <ShortcutsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </SidebarProvider>
   );
 }
 
-/** ⌘/Ctrl + \ toggles the sidebar until the central shortcut registry lands (Phase 3). */
-function SidebarKeyboardToggle() {
+/** Quiet affordance that teaches ⌘K and opens the palette on click. */
+const subscribeNoop = () => () => {};
+
+function QuickMenuHint() {
+  const { open } = useCommandPalette();
+  // Client-only value: SSR renders "" and hydration swaps to the platform
+  // combo without a text mismatch or a cascading set-state effect.
+  const shortcut = useSyncExternalStore(
+    subscribeNoop,
+    () => formatShortcut("palette"),
+    () => "",
+  );
+
+  return (
+    <button
+      type="button"
+      onClick={() => open("all")}
+      aria-label="Open quick menu"
+      className="flex h-7 w-full items-center gap-2 rounded-lg px-1 text-[11px] text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+    >
+      <SearchIcon className="size-[13px] shrink-0" />
+      <span className="truncate group-data-[collapsible=icon]:hidden">
+        Quick menu
+      </span>
+      <kbd className="ml-auto hidden font-mono text-[10px] tracking-widest text-sidebar-foreground/45 transition-colors group-hover:text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden sm:inline-flex">
+        {shortcut}
+      </kbd>
+    </button>
+  );
+}
+
+/** Registry-driven global shortcuts (see src/lib/shortcuts/registry.ts). */
+function AppShortcuts({ onShowHelp }: { onShowHelp: () => void }) {
+  const { open } = useCommandPalette();
+  const { toggle: toggleFocusMode } = useFocusMode();
   const { toggleSidebar } = useSidebar();
+  const router = useRouter();
+
+  const handlers = useMemo(
+    () => ({
+      palette: () => open("all"),
+      quickOpen: () => open("documents"),
+      shortcutsHelp: onShowHelp,
+      toggleSidebar,
+      focusMode: toggleFocusMode,
+      newDocument: () => {
+        void (async () => {
+          const result = await createDocumentAction(null);
+          if (!result.ok) {
+            toast.error(result.error);
+            return;
+          }
+          router.push(`/app/doc/${result.documentId}`);
+          router.refresh();
+        })();
+      },
+      newCollection: () =>
+        window.dispatchEvent(new CustomEvent("native:new-collection")),
+      signOut: () => {
+        void (async () => {
+          const { error } = await authClient.signOut();
+          if (error) {
+            toast.error("Could not sign out. Please try again.");
+            return;
+          }
+          router.replace("/sign-in");
+          router.refresh();
+        })();
+      },
+    }),
+    [open, onShowHelp, toggleFocusMode, toggleSidebar, router],
+  );
+
+  useGlobalShortcuts(handlers);
+  return null;
+}
+
+/** Focus mode keeps the sidebar out of the way until it is toggled again. */
+function FocusModeSidebarSync() {
+  const { focused, setFocused } = useFocusMode();
+  const { setOpen } = useSidebar();
+  const wasFocused = useRef(false);
 
   useEffect(() => {
+    if (focused === wasFocused.current) return;
+    wasFocused.current = focused;
+    setOpen(!focused);
+  }, [focused, setOpen]);
+
+  // Escape always leaves focus mode.
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "\\") {
-        event.preventDefault();
-        toggleSidebar();
-      }
+      if (event.key === "Escape" && focused) setFocused(false);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [toggleSidebar]);
+  }, [focused, setFocused]);
 
   return null;
+}
+
+function ExitFocusButton() {
+  const { setFocused } = useFocusMode();
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="fixed right-5 bottom-5 z-40 rounded-full shadow-sm"
+      onClick={() => setFocused(false)}
+    >
+      Exit focus
+      <span className="ml-1 text-xs text-muted-foreground">⌘.</span>
+    </Button>
+  );
 }
 
 function WorkspaceSwitcher({ workspaces }: { workspaces: WorkspaceSummary[] }) {
@@ -220,7 +369,8 @@ function UserMenu({ user }: { user: ShellUser }) {
           {user.name}
         </span>
         {/* Keyboard affordance: the row is the account menu's trigger. */}
-        <CommandIcon className="ml-auto size-[17px] text-sidebar-primary group-data-[collapsible=icon]:hidden" />
+        {/* Click affordance: the row opens the account menu on click. */}
+        <ChevronsUpDownIcon className="ml-auto size-[17px] text-sidebar-primary group-data-[collapsible=icon]:hidden" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" className="w-56">
         <DropdownMenuGroup>
@@ -239,10 +389,13 @@ function UserMenu({ user }: { user: ShellUser }) {
           </DropdownMenuRadioGroup>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={() => void handleSignOut()}>
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => void handleSignOut()}
+        >
           <LogOutIcon />
           Sign out
-          <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+          <DropdownMenuShortcut>{formatShortcut("signOut")}</DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

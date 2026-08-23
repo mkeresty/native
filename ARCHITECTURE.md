@@ -116,7 +116,7 @@ Light/dark ship by default. A theme = `{ name, variables }`; future premium them
 0. **Architecture** — this document.
 1. **Foundation** — Next.js + TS strict + Tailwind v4 + shadcn tokens/themes, Drizzle + Neon, Better Auth sign-in/up/sign-out, authenticated shell (sidebar skeleton, user menu, empty states), CI, `.env.example`. *Deployable authenticated app shell.* ✅
 2. **Documents** — workspaces/folders/documents CRUD, Tiptap editor with core Markdown (official `@tiptap/markdown`; `content_md` is canonical at rest), debounced autosave + save status, export `.md`, sidebar tree with folders, unit + E2E tests. *A user can create and edit Markdown documents.* ✅
-3. **Keyboard UX** — shortcut registry, command palette, quick open, focus mode, shortcut help.
+3. **Keyboard UX** — shortcut registry, command palette, quick open, focus mode, shortcut help. *A developer can operate most of the application without touching the mouse.* ✅
 4. **Collaboration** — Yjs + PartyKit rooms, presence, cursors, status/reconnect. Gate: two browsers converge reliably.
 5. **Developer features** — syntax highlighting, copy buttons, tables/checklists/callouts polish, language picker.
 6. **History & search** — document_versions, diffs, title/content search, recents.
