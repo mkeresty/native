@@ -12,6 +12,10 @@ export const metadata: Metadata = {
   },
   description:
     "A collaborative writing room for clear thinking and lasting words.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: ["/icon.svg"],
+  },
 };
 
 export const viewport: Viewport = {
