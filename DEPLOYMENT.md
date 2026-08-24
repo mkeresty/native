@@ -1,6 +1,6 @@
 # Deployment
 
-Target: **Vercel** (app) + **Neon** (Postgres). Total cost at MVP scale: ~$0.
+Target: **Vercel** (app) + **Neon** (Postgres) + **PartyKit** (realtime). Total cost at MVP scale: ~$0.
 
 ## Environments
 
@@ -37,15 +37,54 @@ Target: **Vercel** (app) + **Neon** (Postgres). Total cost at MVP scale: ~$0.
 
    Subsequent migrations are applied automatically — see below.
 
+## Realtime collaboration (PartyKit)
+
+The app deploys and runs without it — with `NEXT_PUBLIC_COLLAB_HOST` unset the
+editor works in solo mode. Realtime is a separate deployment:
+
+1. **Account**: `bunx partykit login` (free tier).
+2. **Deploy the party**: `bunx partykit deploy` (config: `partykit.json`,
+   server: `party/doc.ts` — one room per document).
+3. **Party env** (production):
+
+   ```bash
+   partykit env add APP_URL=https://your-production-domain --production
+   partykit env add COLLAB_API_SECRET="<openssl rand -base64 32>" --production
+   ```
+
+4. **Vercel env** (Production):
+
+   | Variable | Value |
+   | --- | --- |
+   | `NEXT_PUBLIC_COLLAB_HOST` | `<project>.<user>.partykit.dev` |
+   | `COLLAB_API_SECRET` | same value as the party's |
+
+   Redeploy the app after adding the variables — `NEXT_PUBLIC_*` is inlined at
+   build time.
+
+`COLLAB_API_SECRET` authenticates the service calls in both directions: the
+app signs room tickets with it, and the party presents it when it reads room
+bootstrap state or writes Yjs snapshots (`/api/collab/*`). Rotating it
+requires updating both sides; existing room tickets expire within two minutes.
+
+Local development: `bunx partykit dev --var "APP_URL=http://localhost:3000"`
+alongside `bun run dev`, with `NEXT_PUBLIC_COLLAB_HOST=127.0.0.1:1999` and a
+matching `COLLAB_API_SECRET` in `.env.local`. The E2E suite starts both
+servers itself (see `playwright.config.ts`).
+
 ## CI/CD
 
 `.github/workflows/ci.yml` runs on every PR and push to `main`:
 
 ```text
 install (bun, frozen lockfile)
+  → generate route types (next typegen)
   → typecheck (tsc --noEmit)
   → lint (eslint)
+  → unit tests (vitest)
   → build (next build)
+
+e2e job: Postgres service + migrations + Playwright (partykit dev + next dev)
 ```
 
 Rules of the pipeline:

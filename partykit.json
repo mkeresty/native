@@ -1,0 +1,10 @@
+{
+  "$schema": "https://www.partykit.io/schema.json",
+  "name": "native-collab",
+  "main": "party/doc.ts",
+  "compatibilityDate": "2026-08-23",
+  "vars": {
+    "APP_URL": "http://localhost:3000",
+    "COLLAB_API_SECRET": "dev-only-collab-secret"
+  }
+}

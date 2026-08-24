@@ -5,6 +5,8 @@ import { Markdown } from "@tiptap/markdown";
 import StarterKit from "@tiptap/starter-kit";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import {
   BoldIcon,
   CheckIcon,
@@ -34,6 +36,15 @@ import { toast } from "sonner";
 
 import { saveDocumentAction } from "@/features/documents/actions";
 import { useFocusMode } from "@/features/workspace/ui-state";
+import {
+  presenceColor,
+  presenceInitials,
+} from "@/features/collaboration/presence";
+import {
+  useCollaboration,
+  type CollabPeer,
+  type CollabStatus,
+} from "@/features/collaboration/use-collaboration";
 import {
   MarkdownSource,
   type MarkdownSourceHandle,
@@ -115,6 +126,7 @@ type SaveStatus = "saved" | "dirty" | "saving" | "error";
 
 export function DocumentEditor({
   document: initialDocument,
+  user,
 }: {
   document: {
     id: string;
@@ -124,8 +136,16 @@ export function DocumentEditor({
     authorName: string;
     updatedAt: Date;
   };
+  user: { id: string; name: string };
 }) {
   const { focused } = useFocusMode();
+  const collab = useCollaboration({
+    documentId: initialDocument.id,
+    user,
+  });
+  // Solo mode is ready immediately; collaboration waits for the first Yjs
+  // sync so the editor never binds to a half-loaded document.
+  const collabReady = !collab.enabled || collab.ready;
   const [title, setTitle] = useState(initialDocument.title);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -155,29 +175,53 @@ export function DocumentEditor({
     dirty: false,
   });
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        // Replaced below with a variant that renders its own language picker.
-        codeBlock: false,
-        heading: { levels: [1, 2, 3, 4] },
-        link: {
-          openOnClick: false,
-          autolink: true,
-          defaultProtocol: "https",
-          HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
-        },
-      }),
-      CodeBlockWithLanguage,
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Markdown.configure({
-        indentation: { style: "space", size: 2 },
-      }),
-    ],
-    content: initialDocument.contentMd,
-    contentType: "markdown",
-    immediatelyRender: false,
+  // In collaboration mode the editor is recreated once the first sync lands:
+  // content then comes from the shared Yjs fragment, never from the stale
+  // server markdown snapshot. The pre-sync instance is never displayed.
+  const collaborative = collab.enabled && collabReady && collab.ydoc !== null;
+
+  const editor = useEditor(
+    {
+      extensions: [
+        StarterKit.configure({
+          // Replaced below with a variant that renders its own language picker.
+          codeBlock: false,
+          heading: { levels: [1, 2, 3, 4] },
+          link: {
+            openOnClick: false,
+            autolink: true,
+            defaultProtocol: "https",
+            HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
+          },
+          // Yjs owns undo/redo while collaborating; local history would
+          // desync the CRDT.
+          ...(collaborative ? { undoRedo: false as const } : {}),
+        }),
+        CodeBlockWithLanguage,
+        TaskList,
+        TaskItem.configure({ nested: true }),
+        Markdown.configure({
+          indentation: { style: "space", size: 2 },
+        }),
+        ...(collaborative && collab.ydoc && collab.provider
+          ? [
+              Collaboration.configure({ document: collab.ydoc }),
+              CollaborationCaret.configure({
+                provider: collab.provider,
+                user: {
+                  id: user.id,
+                  name: user.name,
+                  color: presenceColor(user.id),
+                },
+              }),
+            ]
+          : []),
+      ],
+      // In collaborative mode the Yjs fragment is the initial content.
+      ...(collaborative
+        ? {}
+        : { content: initialDocument.contentMd, contentType: "markdown" as const }),
+      immediatelyRender: false,
     editorProps: {
       attributes: {
         class: "tiptap-prose min-h-full outline-none",
@@ -224,11 +268,52 @@ export function DocumentEditor({
       latestRef.current.dirty = true;
       setStatus("dirty");
     },
-  });
+    // Recreate once (solo → collaborative) so the editor binds the synced
+    // Yjs fragment instead of the server markdown snapshot.
+  }, [collabReady]);
 
   useEffect(() => {
     editorRef.current = editor ?? null;
   }, [editor]);
+
+  /**
+   * First-run seeding. A brand-new document has no Yjs state anywhere, so the
+   * first client to arrive promotes the stored Markdown into the fragment.
+   * A short delay plus a CRDT flag (`meta.seeded`) keeps two clients that open
+   * the doc simultaneously from seeding it twice.
+   */
+  const [seedResolved, setSeedResolved] = useState(!collab.enabled);
+  useEffect(() => {
+    if (!collab.enabled || !collab.ydoc || !editor || !collab.ready) return;
+    const meta = collab.ydoc.getMap("meta");
+    const fragment = collab.ydoc.getXmlFragment("default");
+    const timer = setTimeout(() => {
+      if (!meta.get("seeded")) {
+        if (fragment.length === 0 && initialDocument.contentMd.trim() !== "") {
+          editor.commands.setContent(initialDocument.contentMd, {
+            contentType: "markdown",
+          });
+        }
+        meta.set("seeded", true);
+      }
+      setSeedResolved(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [collab.enabled, collab.ready, collab.ydoc, editor, initialDocument.contentMd]);
+
+  /**
+   * Self-heal for canonical Markdown. The party snapshots only the binary Yjs
+   * state, so after an abrupt disconnect `content_md` can trail the fragment;
+   * the first client to sync writes the converged Markdown back.
+   */
+  useEffect(() => {
+    if (!collab.enabled || !seedResolved || !editor || !collab.ready) return;
+    const md = editor.getMarkdown();
+    if (md === latestRef.current.contentMd) return;
+    latestRef.current.contentMd = md;
+    latestRef.current.dirty = true;
+    setStatus("dirty");
+  }, [collab.enabled, collab.ready, seedResolved, editor]);
 
   const flushSave = useCallback(async () => {
     if (!latestRef.current.dirty) return;
@@ -513,6 +598,18 @@ export function DocumentEditor({
     URL.revokeObjectURL(url);
   }
 
+  // Collaboration only: hold chrome steady while the first Yjs sync lands.
+  // All hooks have run above; the pre-sync editor instance is discarded.
+  if (!collabReady) {
+    return (
+      <div className="flex h-full min-h-0 flex-col bg-workspace">
+        <div className="flex flex-1 items-center justify-center text-xs text-editor-muted-foreground">
+          Connecting to the document…
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-workspace">
       {/* Left padding reserves the gutter for the shell's sidebar toggle.
@@ -528,7 +625,9 @@ export function DocumentEditor({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <SaveStatusIndicator status={status} savedAt={savedAt} />
-          <Collaborators />
+          {collab.enabled ? (
+            <PresenceStack peers={collab.peers} status={collab.status} />
+          ) : null}
           <Button
             variant="outline"
             size="icon-sm"
@@ -656,21 +755,57 @@ export function DocumentEditor({
   );
 }
 
-function Collaborators() {
+/** Live presence: peer avatars, plus a calm indicator when the room is down. */
+function PresenceStack({
+  peers,
+  status,
+}: {
+  peers: CollabPeer[];
+  status: CollabStatus;
+}) {
   return (
-    <AvatarGroup aria-label="Ada, Jordan, and Priya are collaborating">
-      {[
-        ["AL", "bg-presence-1"],
-        ["JM", "bg-presence-2"],
-        ["PK", "bg-presence-3"],
-      ].map(([initials, color]) => (
-        <Avatar key={initials} className="size-[25px] border-2 border-card">
-          <AvatarFallback className={cn(color, "font-mono text-[9px] font-extrabold text-primary-foreground")}>
-            {initials}
-          </AvatarFallback>
-        </Avatar>
-      ))}
-    </AvatarGroup>
+    <div className="flex items-center gap-2">
+      {peers.length > 0 ? (
+        <AvatarGroup
+          aria-label={
+            peers.length === 1
+              ? "You are the only one here"
+              : `${peers.map((peer) => peer.name).join(", ")} are collaborating`
+          }
+        >
+          {peers.slice(0, 4).map((peer) => (
+            <Avatar
+              key={peer.clientId}
+              className="size-[25px] border-2 border-card"
+              title={peer.isSelf ? `${peer.name} (you)` : peer.name}
+            >
+              <AvatarFallback
+                style={{ backgroundColor: peer.color }}
+                className="font-mono text-[9px] font-extrabold text-white"
+              >
+                {presenceInitials(peer.name)}
+              </AvatarFallback>
+            </Avatar>
+          ))}
+          {peers.length > 4 ? (
+            <Avatar className="size-[25px] border-2 border-card">
+              <AvatarFallback className="bg-muted font-mono text-[9px] font-extrabold text-muted-foreground">
+                +{peers.length - 4}
+              </AvatarFallback>
+            </Avatar>
+          ) : null}
+        </AvatarGroup>
+      ) : null}
+      {status === "offline" ? (
+        <span
+          className="inline-flex items-center gap-1.5 text-xs text-editor-muted-foreground"
+          role="status"
+        >
+          <span aria-hidden className="size-1.5 rounded-full bg-muted-foreground/50" />
+          Offline — edits sync when reconnected
+        </span>
+      ) : null}
+    </div>
   );
 }
 

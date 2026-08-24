@@ -344,7 +344,7 @@ Semantic tokens are defined once per theme as CSS variables. Light/dark ship by 
 1. **Foundation** — Next.js, TypeScript, Tailwind/shadcn, Drizzle/Neon, Better Auth, authenticated shell, CI. ✅
 2. **Documents** — Native workspace/folder/document CRUD, Tiptap Markdown editor, autosave, export `.md`. ✅
 3. **Keyboard UX** — shortcut registry, command palette, quick open, focus mode, shortcut help. ✅
-4. **Collaboration** — Yjs + PartyKit, presence, cursors, status/reconnect. Gate: two browsers converge reliably.
+4. **Collaboration** — Yjs + PartyKit, presence, cursors, status/reconnect. Gate: two browsers converge reliably. ✅
 5. **Developer features** — syntax highlighting, code blocks, tables/checklists/callouts polish.
 6. **Native history & search** — snapshots/diffs, title/content search, recents.
 7. **GitHub foundation** — GitHub connection, repository selection, root-path selection, repository/document mapping.

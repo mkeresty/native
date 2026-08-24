@@ -26,6 +26,7 @@ export default async function DocumentPage({ params }: PageProps) {
 
   return (
     <DocumentEditor
+      user={{ id: session.user.id, name: session.user.name }}
       document={{
         id: doc.id,
         title: doc.title,
