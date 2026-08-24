@@ -6,7 +6,7 @@
  * undeployable for new accounts (partykit.dev zone limit; free-plan SQLite DO
  * migrations). Everything else is unchanged:
  *
- * - Auth: browsers cannot send Native's session cookies on a cross-origin
+ * - Auth: browsers cannot send Editora's session cookies on a cross-origin
  *   WebSocket, so clients present a short-lived HMAC ticket (see
  *   src/lib/collaboration/ticket.ts) verified here per connection.
  * - Cold start: the document resumes from the last Yjs snapshot in Postgres

@@ -1,4 +1,4 @@
-# Native
+# Editora
 
 A collaborative Markdown workspace for developers — Google Docs for technical
 knowledge, with Markdown as the underlying format.
@@ -11,7 +11,7 @@ knowledge, with Markdown as the underlying format.
 - **Next.js** (App Router) · React · strict TypeScript
 - **Tailwind CSS v4** + **shadcn/ui** (Base UI primitives)
 - **PostgreSQL** via **Drizzle ORM** (Neon-compatible)
-- **Better Auth** — email/password, sessions stored in our own database
+- **Neon Auth** (managed Better Auth) — email/password with custom app UI
 - **Bun** as package manager and script runner
 - Deploy target: Vercel + Neon (see [DEPLOYMENT.md](./DEPLOYMENT.md))
 
@@ -33,9 +33,9 @@ bun run dev                  # http://localhost:3000
 `.env.local` for local development:
 
 ```text
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/native
-BETTER_AUTH_URL=http://localhost:3000
-BETTER_AUTH_SECRET=<any long random string>
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/editora
+NEON_AUTH_BASE_URL=https://ep-xxx.neonauth.us-east-1.aws.neon.tech/neondb/auth
+NEON_AUTH_COOKIE_SECRET=<openssl rand -base64 32>
 ```
 
 Sign up at `/sign-up` — a personal workspace is created automatically.
@@ -66,5 +66,5 @@ src/
   features/       # feature modules (auth forms, workspace shell)
   lib/            # auth config, workspace logic, utils
 drizzle/          # versioned SQL migrations (do not edit by hand)
-proxy.ts          # optimistic auth redirects (Next.js proxy)
+proxy.ts          # Neon Auth route protection and session refresh (Next.js proxy)
 ```

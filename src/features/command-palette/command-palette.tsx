@@ -117,7 +117,7 @@ export function CommandPalette({ documents }: Props) {
               <CommandItem
                 onSelect={() => {
                   window.dispatchEvent(
-                    new CustomEvent("native:new-collection"),
+                    new CustomEvent("editora:new-collection"),
                   );
                   setOpen(false);
                 }}

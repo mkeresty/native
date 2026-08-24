@@ -1,29 +1,34 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 
 import { AppShell } from "@/features/workspace/app-shell";
 import { db } from "@/db";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
+import { getApplicationUserId } from "@/lib/auth/profile";
 import { listWorkspaceTree } from "@/lib/documents/server";
 import { createDefaultWorkspace, getUserWorkspaces } from "@/lib/workspaces/server";
+
+export const dynamic = "force-dynamic";
 
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/sign-in");
+  const { data: session } = await getAuth().getSession();
+  if (!session?.user) redirect("/sign-in");
 
-  let workspaces = await getUserWorkspaces(session.user.id);
+  const userId = await getApplicationUserId(session.user);
+
+  let workspaces = await getUserWorkspaces(userId);
   if (workspaces.length === 0) {
-    // Self-heal for accounts created before the signup hook existed.
-    await createDefaultWorkspace(db, session.user.id, session.user.name);
-    workspaces = await getUserWorkspaces(session.user.id);
+    // Neon Auth has no app-specific database hooks. Provision on the first
+    // authenticated app request, after its local profile is ready.
+    await createDefaultWorkspace(db, userId, session.user.name);
+    workspaces = await getUserWorkspaces(userId);
   }
 
   const activeWorkspace = workspaces[0];
-  const tree = await listWorkspaceTree(session.user.id, activeWorkspace.id);
+  const tree = await listWorkspaceTree(userId, activeWorkspace.id);
 
   return (
     <AppShell

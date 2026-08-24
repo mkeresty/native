@@ -4,10 +4,10 @@ Collaborative Markdown workspace for developers. Google Docs for technical knowl
 
 ## Product Model
 
-Native supports two first-class modes:
+Editora supports two first-class modes:
 
-1. **Native workspace** — documents live and collaborate entirely in Native. No repository is required.
-2. **Git-backed workspace** — the same Native documents may additionally map to Markdown files in a GitHub repository and be deliberately published as commits or pull requests.
+1. **Editora workspace** — documents live and collaborate entirely in Editora. No repository is required.
+2. **Git-backed workspace** — the same Editora documents may additionally map to Markdown files in a GitHub repository and be deliberately published as commits or pull requests.
 
 GitHub is a core product capability, but it is **optional**. Connecting a repository must never be required to create a workspace, write a document, collaborate, search, use history, or export Markdown.
 
@@ -44,18 +44,18 @@ If not, the feature is too tightly coupled to Git.
 4. The collaborative state serializes back to Markdown for persistence.
 5. CRDT state must never become the only representation of a document.
 
-Markdown is the common representation used for Native persistence, `.md` import/export, search, Native version history, Git diffs, commits, pull requests, and future Git providers.
+Markdown is the common representation used for Editora persistence, `.md` import/export, search, Editora version history, Git diffs, commits, pull requests, and future Git providers.
 
 The editor must not care whether a document is Git-backed.
 
 ## Core Data Flow
 
 ```text
-                         Native
+                         Editora
                            |
               +------------+------------+
               |                         |
-         Native-only                 Git-backed
+         Editora-only                 Git-backed
          documents                   documents
               |                         |
               +------------+------------+
@@ -84,7 +84,7 @@ Postgres and Git solve different problems.
 
 ### Postgres is the collaborative working tree
 
-Postgres stores current application state: users/workspaces, memberships/permissions, immutable Native document identity, current Markdown, Native version history, collaboration metadata/state, and repository mapping/sync metadata.
+Postgres stores current application state: users/workspaces, memberships/permissions, immutable Editora document identity, current Markdown, Editora version history, collaboration metadata/state, and repository mapping/sync metadata.
 
 Autosave may update Postgres frequently. Typing must never create Git commits automatically.
 
@@ -133,7 +133,7 @@ GitHub
 Rules:
 
 - Editor code must not contain GitHub-specific logic.
-- Collaboration must work identically for Native-only documents.
+- Collaboration must work identically for Editora-only documents.
 - Git publishing operates on canonical Markdown, not raw CRDT internals.
 - GitHub credentials/tokens remain in the integration layer.
 - Shortcut registry remains the single source for key handlers, palette, tooltips, and help.
@@ -141,7 +141,7 @@ Rules:
 
 ## Database Schema
 
-Existing Native domain tables remain valid:
+Existing Editora domain tables remain valid:
 
 ```text
 workspaces
@@ -183,10 +183,10 @@ The exact schema should be finalized during implementation; avoid speculative fi
 
 ### Document identity
 
-A Native UUID is always the document identity. Filename/path is not identity.
+A Editora UUID is always the document identity. Filename/path is not identity.
 
 ```text
-id: 8ac1...                         // stable Native identity
+id: 8ac1...                         // stable Editora identity
 title: Authentication Architecture
 repository_id: repo_123             // nullable
 git_path: architecture/auth.md      // nullable
@@ -195,9 +195,9 @@ content_md: ...
 
 Renaming the display title must not silently rename a Git file. A file/path rename is an explicit Git-visible operation.
 
-## Native Folders vs Git Paths
+## Editora Folders vs Git Paths
 
-Native-only workspaces may continue using Native folder records.
+Editora-only workspaces may continue using Editora folder records.
 
 For Git-backed content, repository paths are authoritative for filesystem hierarchy.
 
@@ -226,7 +226,7 @@ How do you want to start?
 [ Import Markdown ]
 ```
 
-A Native-only workspace should be connectable to GitHub later without recreating documents.
+A Editora-only workspace should be connectable to GitHub later without recreating documents.
 
 ## GitHub MVP Workflow
 
@@ -238,8 +238,8 @@ Initial workflow:
 2. Select repository.
 3. Select documentation directory/root path.
 4. Import/discover Markdown files.
-5. Map them to stable Native document IDs.
-6. Edit using the normal collaborative Native editor.
+5. Map them to stable Editora document IDs.
+6. Edit using the normal collaborative Editora editor.
 7. Autosave working state to Postgres.
 8. Surface unpublished changes.
 9. Review Git-style Markdown diffs.
@@ -257,9 +257,9 @@ A repository-level sync record may eventually track operations, but do not intro
 
 Full inbound synchronization may follow the initial outbound publishing workflow, but the architecture must anticipate it.
 
-If Native last synchronized at commit `ABC` and GitHub is now at `DEF`, compare `ABC → DEF` to identify externally changed tracked files.
+If Editora last synchronized at commit `ABC` and GitHub is now at `DEF`, compare `ABC → DEF` to identify externally changed tracked files.
 
-If external changes do not overlap locally modified documents, they may eventually be pulled automatically. If both Native and GitHub changed the same document, never silently overwrite either side.
+If external changes do not overlap locally modified documents, they may eventually be pulled automatically. If both Editora and GitHub changed the same document, never silently overwrite either side.
 
 Use a three-way reconciliation model:
 
@@ -268,7 +268,7 @@ BASE
 last synchronized Markdown
 
 OURS
-current collaborative Native Markdown
+current collaborative Editora Markdown
 
 THEIRS
 current GitHub Markdown
@@ -278,21 +278,21 @@ External Git changes are Markdown revisions, not Yjs operations. Do not manufact
 
 ## Version History
 
-Native history and Git history are separate by design.
+Editora history and Git history are separate by design.
 
-### Native history
+### Editora history
 
-Native history protects the editing experience and supports recovery, restore, periodic/meaningful snapshots, and diffs between Native snapshots. Do not create a version for every keystroke.
+Editora history protects the editing experience and supports recovery, restore, periodic/meaningful snapshots, and diffs between Editora snapshots. Do not create a version for every keystroke.
 
 ### Git history
 
 Git history contains deliberately published engineering checkpoints: commits, branches, pull requests, and repository review/history.
 
-Restoring a Native version creates a new current state rather than deleting subsequent history.
+Restoring a Editora version creates a new current state rather than deleting subsequent history.
 
 ## Diffs
 
-Diffs do not need to be persisted for the MVP. Native can compute textual Markdown diffs from two snapshots when needed.
+Diffs do not need to be persisted for the MVP. Editora can compute textual Markdown diffs from two snapshots when needed.
 
 For Git publishing, compare the Git base Markdown with the current Postgres Markdown.
 
@@ -305,8 +305,8 @@ The review experience should feel familiar to developers.
 
 ## Realtime / Collaboration Architecture
 
-- One Hocuspocus room per open Native document (room name = document id).
-- Clients authenticate against Native workspace membership.
+- One Hocuspocus room per open Editora document (room name = document id).
+- Clients authenticate against Editora workspace membership.
 - Awareness provides presence, cursors, and selections.
 - Connection status uses calm indicators such as `Saved`, `Saving…`, and `Offline`.
 - Local edits buffer/resync according to Yjs semantics.
@@ -316,13 +316,13 @@ GitHub is not the realtime transport.
 
 ## Search
 
-Native-only and Git-backed documents participate in the same search experience. Search operates against Native's current/indexed state rather than using GitHub search for normal navigation. Postgres search is sufficient initially.
+Editora-only and Git-backed documents participate in the same search experience. Search operates against Editora's current/indexed state rather than using GitHub search for normal navigation. Postgres search is sufficient initially.
 
 ## Authentication and Authorization
 
-Native authorization and GitHub repository authorization are distinct.
+Editora authorization and GitHub repository authorization are distinct.
 
-A user may have permission to edit a Native workspace without having permission to publish to its connected repository. Server-side authorization must enforce both layers.
+A user may have permission to edit a Editora workspace without having permission to publish to its connected repository. Server-side authorization must enforce both layers.
 
 ## CI/CD Pipeline
 
@@ -342,11 +342,11 @@ Semantic tokens are defined once per theme as CSS variables. Light/dark ship by 
 
 0. **Architecture** — product and system boundaries. ✅
 1. **Foundation** — Next.js, TypeScript, Tailwind/shadcn, Drizzle/Neon, Better Auth, authenticated shell, CI. ✅
-2. **Documents** — Native workspace/folder/document CRUD, Tiptap Markdown editor, autosave, export `.md`. ✅
+2. **Documents** — Editora workspace/folder/document CRUD, Tiptap Markdown editor, autosave, export `.md`. ✅
 3. **Keyboard UX** — shortcut registry, command palette, quick open, focus mode, shortcut help. ✅
 4. **Collaboration** — Yjs + Hocuspocus, presence, cursors, status/reconnect. Gate: two browsers converge reliably. ✅
 5. **Developer features** — syntax highlighting, code blocks, tables/checklists/callouts polish.
-6. **Native history & search** — snapshots/diffs, title/content search, recents.
+6. **Editora history & search** — snapshots/diffs, title/content search, recents.
 7. **GitHub foundation** — GitHub connection, repository selection, root-path selection, repository/document mapping.
 8. **GitHub publishing** — import/discover `.md`, unpublished-change detection, diff review, commit and PR creation.
 9. **Polish & QA** — motion, states, accessibility, performance, auth/editor/collaboration/Git edge cases.
@@ -356,10 +356,10 @@ Semantic tokens are defined once per theme as CSS variables. Light/dark ship by 
 
 In scope for the Git-enabled MVP direction:
 
-- Native-only workspaces
+- Editora-only workspaces
 - Markdown import/export
 - collaborative editing
-- Native autosave/history/search
+- Editora autosave/history/search
 - optional GitHub connection
 - repository selection
 - docs/root-directory selection
@@ -387,7 +387,7 @@ Can be deferred:
 
 ## Long-Term Direction
 
-Native should become the fastest, nicest way for engineering teams to collaboratively maintain technical knowledge while retaining ownership of that knowledge as portable Markdown.
+Editora should become the fastest, nicest way for engineering teams to collaboratively maintain technical knowledge while retaining ownership of that knowledge as portable Markdown.
 
 ```text
 Excellent editor
@@ -405,4 +405,4 @@ Bidirectional Git synchronization
 Developer-specific tooling
 ```
 
-Do not turn Native into a generic Notion/project-management clone. New functionality should primarily improve the creation, collaboration, review, publishing, or maintenance of technical documentation.
+Do not turn Editora into a generic Notion/project-management clone. New functionality should primarily improve the creation, collaboration, review, publishing, or maintenance of technical documentation.

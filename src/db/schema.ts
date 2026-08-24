@@ -12,11 +12,13 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * Auth tables (user, session, account, verification) are managed by Better Auth
- * and must match the field names its Drizzle adapter expects. Do not rename.
+ * Application profiles. Neon Auth owns passwords, sessions, and accounts in
+ * its `neon_auth` schema. This table keeps the app's stable profile ids and
+ * bridges existing local users to their managed Neon Auth identity.
  */
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
+  authUserId: text("auth_user_id").unique(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),

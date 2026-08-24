@@ -138,11 +138,22 @@ test.describe("critical user journey", () => {
     await page.reload();
 
     const itemMenu = page.getByRole("button", { name: "Actions for Doomed doc" });
-    await itemMenu.click({ force: true }); // action button reveals on hover
-    await page
-      .locator("[data-slot=dropdown-menu-content]")
-      .getByRole("menuitem", { name: "Delete document" })
-      .click();
+    const menuContent = page.locator("[data-slot=dropdown-menu-content]");
+    const deleteItem = menuContent.getByRole("menuitem", {
+      name: "Delete document",
+    });
+    // action button reveals on hover; on a slow runner the click can land
+    // before the dropdown handler hydrates, so retry until the menu opens.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await itemMenu.click({ force: true });
+      try {
+        await deleteItem.waitFor({ state: "visible", timeout: 2_000 });
+        break;
+      } catch {
+        // menu never opened — click again
+      }
+    }
+    await deleteItem.click();
 
     // Navigates home; the document disappears from the tree.
     await page.waitForURL(/\/app$/);

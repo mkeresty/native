@@ -12,7 +12,8 @@ Target: **Vercel** (app) + **Neon** (Postgres) + **Hocuspocus on Render** (realt
 
 ## First-time setup
 
-1. **Neon**: create a project → copy the pooled connection string.
+1. **Neon**: create a project → copy the pooled connection string, enable Neon
+   Auth, and copy the branch-specific Auth endpoint from the Neon console.
 2. **Vercel**: import the repository; framework preset Next.js, build command
    `bun run build` (or default).
 3. Set environment variables in Vercel:
@@ -20,14 +21,12 @@ Target: **Vercel** (app) + **Neon** (Postgres) + **Hocuspocus on Render** (realt
    | Variable | Production | Preview |
    | --- | --- | --- |
    | `DATABASE_URL` | Neon pooled connection string | Neon **branch** connection string |
-   | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` | same or separate |
-   | `BETTER_AUTH_URL` | `https://your-production-domain` | **leave unset** |
+   | `NEON_AUTH_BASE_URL` | production branch Auth endpoint | Preview branch Auth endpoint |
+   | `NEON_AUTH_COOKIE_SECRET` | `openssl rand -base64 32` | same value |
    | `RUN_MIGRATIONS_ON_PREVIEW` | — | `1`, only if Preview has its own branch |
 
-   `BETTER_AUTH_URL` is deliberately production-only. Preview deployments get a
-   generated hostname, so a single fixed value would point auth callbacks and
-   cookies at the wrong origin; previews resolve their own origin from
-   `VERCEL_URL` instead (`src/lib/auth/base-url.ts`).
+   In the Neon console, add every app origin that can sign users in (production,
+   previews, and `http://localhost:3000`) to Neon Auth's allowed domains.
 
 4. Apply migrations to production once, before the first deploy:
 
@@ -144,8 +143,8 @@ Command to `bun run vercel-build` explicitly.
 ## Secrets
 
 - Never commit secrets. `.env*` is gitignored except `.env.example`.
-- Rotate `BETTER_AUTH_SECRET` only with a plan for invalidating sessions — it
-  signs all session tokens.
+- Rotate `NEON_AUTH_COOKIE_SECRET` only with a plan for invalidating cached
+  sessions — it signs the app's session-data cookie.
 
 ## Rollback
 

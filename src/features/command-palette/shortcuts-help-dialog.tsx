@@ -28,7 +28,7 @@ export function ShortcutsHelpDialog({
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
-            Everything in Native can be reached without leaving the keyboard.
+            Everything in Editora can be reached without leaving the keyboard.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-6">

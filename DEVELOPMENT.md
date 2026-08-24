@@ -22,17 +22,17 @@ The dev server runs on http://localhost:3000 with Turbopack.
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `DATABASE_URL` | yes | Postgres connection string |
-| `BETTER_AUTH_SECRET` | yes | Signs auth session tokens. Generate: `openssl rand -base64 32` |
-| `BETTER_AUTH_URL` | recommended | Canonical base URL; used for cookies/redirects |
+| `NEON_AUTH_BASE_URL` | yes | Branch-specific Neon Auth endpoint from the Neon console |
+| `NEON_AUTH_COOKIE_SECRET` | yes | Signs cached session data. Generate: `openssl rand -base64 32` |
 
 Secrets live only in `.env.local` (gitignored). `.env.example` is the tracked
 template.
 
 ## Database
 
-Schema lives in `src/db/schema.ts`. Auth tables (`user`, `session`, `account`,
-`verification`) are owned by Better Auth — change them only via its options,
-never by renaming columns.
+Schema lives in `src/db/schema.ts`. Neon Auth owns authentication data in the
+`neon_auth` schema. The local `user` table is an application profile and maps
+managed identities to stable workspace/document ownership.
 
 Workflow:
 
@@ -52,15 +52,15 @@ docker compose down -v && docker compose up -d && bun run db:migrate
 
 ## Authentication
 
-Better Auth with email/password (`src/lib/auth/server.ts`). Notes:
+Neon Auth with email/password and custom app-owned forms (`src/lib/auth`). Notes:
 
-- On signup, a database hook creates a personal workspace + owner membership.
-- Sessions are stored in our own Postgres (table `session`).
-- The API is mounted at `/api/auth/[...all]`.
-- Client helpers: `src/lib/auth/client.ts`.
-- Server-side session check: `auth.api.getSession({ headers: await headers() })`.
-- `proxy.ts` performs optimistic cookie-presence redirects only; every protected
-  page revalidates the session server-side.
+- Neon hosts the Better Auth server and its `neon_auth` schema; the app does not
+  store passwords, sessions, or provider accounts.
+- The API proxy is mounted at `/api/auth/[...path]`.
+- Client helpers: `src/lib/auth/client.ts`; no Neon Auth UI components are used.
+- Server-side session check: `const { data: session } = await getAuth().getSession()`.
+- `proxy.ts` protects `/app` and refreshes the signed Neon session cache.
+- A personal workspace is provisioned on the first authenticated `/app` request.
 
 ## Conventions
 

@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
+
+export const dynamic = "force-dynamic";
 
 export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (session) redirect("/app");
+  const { data: session } = await getAuth().getSession();
+  if (session?.user) redirect("/app");
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-6 p-4">
@@ -19,9 +20,9 @@ export default async function AuthLayout({
         className="flex items-center gap-2 font-semibold tracking-tight"
       >
         <span className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          N
+          E
         </span>
-        Native
+        Editora
       </Link>
       {children}
     </main>

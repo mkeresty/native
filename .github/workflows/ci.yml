@@ -65,6 +65,10 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/native
       BETTER_AUTH_SECRET: ci-e2e-secret-not-a-real-production-secret
       BETTER_AUTH_URL: http://localhost:3100
+      # Auth is hosted by Neon (Neon Auth); its service must be reachable for
+      # the sign-up flows the E2E suite exercises. Configure in repo secrets.
+      NEON_AUTH_BASE_URL: ${{ secrets.NEON_AUTH_BASE_URL }}
+      NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
     steps:
       - uses: actions/checkout@v4
 

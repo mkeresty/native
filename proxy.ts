@@ -1,29 +1,16 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
-const SESSION_COOKIE = "better-auth.session_token";
+import { getAuth } from "@/lib/auth/server";
 
 /**
- * Optimistic auth redirects only. Every protected page and server action
- * re-validates the session server-side; this just avoids rendering the
- * wrong screen while the real check happens.
+ * Neon Auth validates sessions before app routes render and refreshes its
+ * signed session cache. Public auth screens remain outside this matcher so a
+ * new visitor can create an account with our custom UI.
  */
-export function proxy(request: NextRequest) {
-  const hasSession = request.cookies.has(SESSION_COOKIE);
-  const { pathname } = request.nextUrl;
-
-  if (!hasSession && pathname.startsWith("/app")) {
-    const signInUrl = new URL("/sign-in", request.url);
-    signInUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  if (hasSession && (pathname === "/sign-in" || pathname === "/sign-up")) {
-    return NextResponse.redirect(new URL("/app", request.url));
-  }
-
-  return NextResponse.next();
+export async function proxy(request: NextRequest) {
+  return getAuth().middleware({ loginUrl: "/sign-in" })(request);
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/sign-in", "/sign-up"],
+  matcher: ["/app/:path*", "/api/auth/:path*"],
 };

@@ -1,4 +1,5 @@
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
+import { getApplicationUserId } from "@/lib/auth/profile";
 import {
   createCollabTicket,
   TICKET_TTL_SECONDS,
@@ -6,7 +7,7 @@ import {
 import { getDocumentForUser } from "@/lib/documents/server";
 
 /**
- * Exchanges a Better Auth session for a short-lived collaboration ticket
+ * Exchanges a Neon Auth session for a short-lived collaboration ticket
  * (see src/lib/collaboration/ticket.ts). The ticket is bound to one document
  * and one user, so a leaked ticket opens nothing else and expires quickly.
  */
@@ -16,8 +17,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "collaboration_disabled" }, { status: 503 });
   }
 
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
+  const { data: session } = await getAuth().getSession();
+  if (!session?.user) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -32,14 +33,15 @@ export async function POST(request: Request) {
   }
 
   // Membership check: only workspace members may open a room for the document.
-  const doc = await getDocumentForUser(session.user.id, documentId);
+  const userId = await getApplicationUserId(session.user);
+  const doc = await getDocumentForUser(userId, documentId);
   if (!doc) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
   const ticket = await createCollabTicket({
     doc: documentId,
-    uid: session.user.id,
+    uid: userId,
     name: session.user.name,
     secret,
     ttlSeconds: TICKET_TTL_SECONDS,

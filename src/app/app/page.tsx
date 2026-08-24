@@ -1,6 +1,5 @@
 import { ClockIcon, FileTextIcon } from "lucide-react";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
@@ -10,14 +9,18 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
+import { getApplicationUserId } from "@/lib/auth/profile";
 import { listRecentDocuments } from "@/lib/documents/server";
 
-export default async function AppHomePage() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/sign-in");
+export const dynamic = "force-dynamic";
 
-  const recent = await listRecentDocuments(session.user.id);
+export default async function AppHomePage() {
+  const { data: session } = await getAuth().getSession();
+  if (!session?.user) redirect("/sign-in");
+
+  const userId = await getApplicationUserId(session.user);
+  const recent = await listRecentDocuments(userId);
 
   if (recent.length === 0) {
     return (

@@ -212,7 +212,7 @@ function AppShortcuts({ onShowHelp }: { onShowHelp: () => void }) {
         })();
       },
       newCollection: () =>
-        window.dispatchEvent(new CustomEvent("native:new-collection")),
+        window.dispatchEvent(new CustomEvent("editora:new-collection")),
       signOut: () => {
         void (async () => {
           const { error } = await authClient.signOut();

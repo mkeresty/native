@@ -49,7 +49,7 @@ export function SignUpForm() {
         setError(error.message ?? "Could not create your account.");
         return;
       }
-      toast.success("Account created. Welcome to Native.");
+      toast.success("Account created. Welcome to Editora.");
       router.replace("/app");
       router.refresh();
     } catch {

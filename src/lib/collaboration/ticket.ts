@@ -2,7 +2,7 @@
  * Short-lived, HMAC-signed tickets that authorize a WebSocket connection to a
  * collaboration room (TASK.md §12, ARCHITECTURE.md "Realtime").
  *
- * Browsers do not attach Native's session cookies to cross-origin WebSocket
+ * Browsers do not attach Editora's session cookies to cross-origin WebSocket
  * upgrades (the PartyKit host is a different origin), so the client first
  * exchanges its session for a ticket bound to one document and one user, then
  * passes the ticket as a query parameter. The party verifies the signature and
@@ -15,7 +15,7 @@
 export type CollabTicketPayload = {
   /** Document (room) id the ticket is valid for. */
   doc: string;
-  /** Native user id. */
+  /** Editora user id. */
   uid: string;
   /** Display name, used for presence/cursor labels. */
   name: string;

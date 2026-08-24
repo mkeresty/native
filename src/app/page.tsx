@@ -4,7 +4,6 @@ import {
   SparklesIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -20,7 +19,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
+
+export const dynamic = "force-dynamic";
 
 const principles = [
   {
@@ -44,8 +45,8 @@ const principles = [
 ];
 
 export default async function LandingPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (session) redirect("/app");
+  const { data: session } = await getAuth().getSession();
+  if (session?.user) redirect("/app");
 
   return (
     <div className="min-h-svh overflow-hidden bg-background text-foreground">

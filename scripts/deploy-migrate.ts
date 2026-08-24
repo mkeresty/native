@@ -8,6 +8,16 @@
 import { runMigrations } from "../src/db/migrate";
 import { migrationPlan } from "../src/lib/deploy/migrations";
 
+if (
+  process.env.VERCEL_ENV &&
+  (!process.env.NEON_AUTH_BASE_URL || !process.env.NEON_AUTH_COOKIE_SECRET)
+) {
+  console.error(
+    "Neon Auth requires NEON_AUTH_BASE_URL and NEON_AUTH_COOKIE_SECRET in this Vercel environment.",
+  );
+  process.exit(1);
+}
+
 const plan = migrationPlan({
   vercelEnv: process.env.VERCEL_ENV,
   databaseUrl: process.env.DATABASE_URL,

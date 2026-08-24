@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
+import { getApplicationUserId } from "@/lib/auth/profile";
 import { getPrimaryWorkspaceId } from "@/lib/documents/server";
 import {
   createDocument,
@@ -19,9 +19,9 @@ import {
 } from "@/lib/documents/server";
 
 async function requireUserId(): Promise<string> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/sign-in");
-  return session.user.id;
+  const { data: session } = await getAuth().getSession();
+  if (!session?.user) redirect("/sign-in");
+  return getApplicationUserId(session.user);
 }
 
 function revalidateApp() {

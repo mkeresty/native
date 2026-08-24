@@ -166,9 +166,9 @@ export function DocumentTree({
     function onNewCollection() {
       setFolderDialogFor("new");
     }
-    window.addEventListener("native:new-collection", onNewCollection);
+    window.addEventListener("editora:new-collection", onNewCollection);
     return () =>
-      window.removeEventListener("native:new-collection", onNewCollection);
+      window.removeEventListener("editora:new-collection", onNewCollection);
   }, []);
 
   const rootDocuments = documents.filter((doc) => doc.folderId === null);

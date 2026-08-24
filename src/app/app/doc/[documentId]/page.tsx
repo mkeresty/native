@@ -1,32 +1,36 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { DocumentEditor } from "@/features/editor/document-editor";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
+import { getApplicationUserId } from "@/lib/auth/profile";
 import { getDocumentForUser } from "@/lib/documents/server";
 
 type PageProps = { params: Promise<{ documentId: string }> };
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) return {};
+  const { data: session } = await getAuth().getSession();
+  if (!session?.user) return {};
   const { documentId } = await params;
-  const doc = await getDocumentForUser(session.user.id, documentId);
+  const userId = await getApplicationUserId(session.user);
+  const doc = await getDocumentForUser(userId, documentId);
   return { title: doc?.title ?? "Document" };
 }
 
 export default async function DocumentPage({ params }: PageProps) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/sign-in");
+  const { data: session } = await getAuth().getSession();
+  if (!session?.user) redirect("/sign-in");
 
   const { documentId } = await params;
-  const doc = await getDocumentForUser(session.user.id, documentId);
+  const userId = await getApplicationUserId(session.user);
+  const doc = await getDocumentForUser(userId, documentId);
   if (!doc) notFound();
 
   return (
     <DocumentEditor
-      user={{ id: session.user.id, name: session.user.name }}
+      user={{ id: userId, name: session.user.name }}
       document={{
         id: doc.id,
         title: doc.title,
