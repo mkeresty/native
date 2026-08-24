@@ -18,13 +18,13 @@ export default defineConfig({
   webServer: process.env.E2E_EXTERNAL_SERVER
     ? undefined
     : [
-        // The collaboration party must be up before the app: the dev server
+        // The collaboration server must be up before the app: the dev server
         // inlines NEXT_PUBLIC_COLLAB_HOST and clients connect on first load.
         {
-          command: `bunx partykit dev --port 1999 --var "APP_URL=http://localhost:${PORT}" --var "COLLAB_API_SECRET=${COLLAB_SECRET}"`,
-          url: `http://127.0.0.1:1999/parties/main/health`,
+          command: `PORT=1999 APP_URL=http://localhost:${PORT} COLLAB_API_SECRET=${COLLAB_SECRET} bunx tsx server/collab.ts`,
+          url: `http://127.0.0.1:1999`,
           reuseExistingServer: true,
-          timeout: 60_000,
+          timeout: 30_000,
         },
         {
           command: `bun run dev --port ${PORT}`,

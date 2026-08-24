@@ -1,14 +1,15 @@
 "use client";
 
+import { HocuspocusProvider } from "@hocuspocus/provider";
+import { Awareness } from "y-protocols/awareness";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
-import YPartyKitProvider from "y-partykit/provider";
 
 import { presenceColor } from "@/features/collaboration/presence";
 
 /**
  * Client half of the collaboration layer (ARCHITECTURE.md "Interfaces"):
- * owns the Yjs doc, the PartyKit connection, and presence. The editor only
+ * owns the Yjs doc, the realtime connection, and presence. The editor only
  * consumes the session object — swapping the realtime provider later means
  * changing this file, not the editor.
  *
@@ -35,14 +36,11 @@ export type Collaboration = {
   ready: boolean;
   status: CollabStatus;
   ydoc: Y.Doc | null;
-  provider: YPartyKitProvider | null;
+  provider: HocuspocusProvider | null;
   peers: CollabPeer[];
 };
 
 const HOST = process.env.NEXT_PUBLIC_COLLAB_HOST;
-// Party name derives from partykit.json's `main` entry point (party/doc.ts
-// is served as the project's single "main" party).
-const PARTY = "main";
 /** Reuse a ticket for half its TTL; a fresh one rides every reconnect. */
 const TICKET_REUSE_MS = 60_000;
 const PROVIDER_RETRIES = 5;
@@ -56,7 +54,7 @@ export function useCollaboration(input: {
   const enabled = Boolean(HOST);
 
   const ydoc = useMemo(() => (enabled ? new Y.Doc() : null), [enabled]);
-  const [provider, setProvider] = useState<YPartyKitProvider | null>(null);
+  const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState<CollabStatus>(
     enabled ? "connecting" : "disabled",
@@ -72,9 +70,10 @@ export function useCollaboration(input: {
   useEffect(() => {
     if (!HOST || !ydoc) return;
     const doc = ydoc;
+    const host = HOST;
 
     let disposed = false;
-    let active: YPartyKitProvider | null = null;
+    let active: HocuspocusProvider | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
     const ticket = { value: null as string | null, at: 0 };
@@ -94,31 +93,62 @@ export function useCollaboration(input: {
       return data.ticket;
     }
 
-    function attach(instance: YPartyKitProvider) {
-      instance.on("status", ({ status: wsStatus }: { status: string }) => {
-        if (disposed) return;
-        setStatus(
-          wsStatus === "connected"
-            ? "live"
-            : wsStatus === "connecting"
-              ? "connecting"
-              : "offline",
-        );
-      });
-      instance.on("synced", () => {
-        if (!disposed) setReady(true);
-      });
+    function connect(attempt = 0) {
+      if (disposed) return;
 
+      const awareness = new Awareness(doc);
       const self = userRef.current;
-      instance.awareness.setLocalStateField("user", {
+      awareness.setLocalStateField("user", {
         id: self.id,
         name: self.name,
         color: presenceColor(self.id),
       });
+
+      const instance = new HocuspocusProvider({
+        // Local development runs plain WS; production hosts terminate TLS.
+        url: /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/.test(host)
+          ? `ws://${host}`
+          : `wss://${host}`,
+        name: documentId,
+        document: doc,
+        awareness,
+        // Re-resolved on every (re)connect, so tickets never go stale.
+        token: () => getTicket(),
+        onStatus: ({ status: wsStatus }) => {
+          if (disposed) return;
+          setStatus(
+            wsStatus === "connected"
+              ? "live"
+              : wsStatus === "connecting"
+                ? "connecting"
+                : "offline",
+          );
+        },
+        onSynced: () => {
+          if (!disposed) setReady(true);
+        },
+        onClose: () => {
+          // Rejected auth (expired ticket) or a dropped socket: the provider
+          // gives up, so recreate with a fresh ticket unless shutting down.
+          if (disposed) return;
+          active?.destroy();
+          if (attempt < PROVIDER_RETRIES) {
+            setStatus("connecting");
+            retryTimer = setTimeout(
+              () => connect(attempt + 1),
+              PROVIDER_RETRY_MS,
+            );
+          } else {
+            setStatus("offline");
+          }
+        },
+      });
+
+      active = instance;
       const refreshPeers = () => {
         if (disposed) return;
         const next: CollabPeer[] = [];
-        for (const [clientId, state] of instance.awareness.getStates()) {
+        for (const [clientId, state] of awareness.getStates()) {
           const peer = (state as { user?: { id: string; name: string; color: string } })
             .user;
           if (!peer) continue;
@@ -132,33 +162,9 @@ export function useCollaboration(input: {
         }
         setPeers(next);
       };
-      instance.awareness.on("change", refreshPeers);
+      awareness.on("change", refreshPeers);
       refreshPeers();
-    }
-
-    function connect(attempt = 0) {
-      if (disposed) return;
-      try {
-        const instance = new YPartyKitProvider(HOST!, documentId, doc, {
-          party: PARTY,
-          // Re-resolved on every (re)connect, so tickets never go stale.
-          params: async () => ({ t: await getTicket() }),
-          // The room lives on another origin; BroadcastChannel would only
-          // reach tabs of the app origin and duplicate updates.
-          disableBc: true,
-        });
-        active = instance;
-        attach(instance);
-        setProvider(instance);
-      } catch {
-        // Most commonly the ticket fetch failing while offline. The provider
-        // cannot retry on its own until it opens once, so recreate instead.
-        if (attempt < PROVIDER_RETRIES) {
-          retryTimer = setTimeout(() => connect(attempt + 1), PROVIDER_RETRY_MS);
-        } else {
-          setStatus("offline");
-        }
-      }
+      setProvider(instance);
     }
 
     connect();

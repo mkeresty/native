@@ -30,11 +30,11 @@ If not, the feature is too tightly coupled to Git.
 | ORM / migrations | Drizzle ORM + drizzle-kit | Typed schema, plain SQL migrations in version control |
 | Auth | Better Auth | Self-hosted on our own Postgres, low recurring cost |
 | Editor | Tiptap 3 / ProseMirror + `y-prosemirror` | Mature rich editor and collaboration model; Markdown serialization |
-| Collaboration | Yjs CRDT; sync via PartyKit (`y-partykit`); snapshots to Postgres | Realtime collaboration without coupling Git to live editing |
+| Collaboration | Yjs CRDT; sync via self-hosted Hocuspocus; snapshots to Postgres | Realtime without coupling Git to live editing. PartyKit was dropped after two platform outages made it undeployable for new accounts (zone limit; free-plan SQLite DO migrations); Hocuspocus is maintained by Tiptap's team and runs on any Node host |
 | Git provider | GitHub initially | Core developer workflow; repository import, diffs, commits, and PRs |
 | Syntax highlighting | lowlight inside Tiptap; Shiki for read-only rendering | Standard editor path plus high-fidelity static output |
 | Command palette | shadcn `Command` (cmdk) driven by central shortcut registry | Single source of truth for bindings/tooltips/help |
-| Hosting | Vercel + PartyKit | Low-ops deploys and preview environments |
+| Hosting | Vercel (app) + Render free tier (realtime server) | Low-ops deploys and preview environments; realtime is a long-running Node process serverless hosts cannot serve |
 
 ## Canonical Document Representation
 
@@ -305,7 +305,7 @@ The review experience should feel familiar to developers.
 
 ## Realtime / Collaboration Architecture
 
-- One PartyKit room per open Native document.
+- One Hocuspocus room per open Native document (room name = document id).
 - Clients authenticate against Native workspace membership.
 - Awareness provides presence, cursors, and selections.
 - Connection status uses calm indicators such as `Saved`, `Saving…`, and `Offline`.
@@ -344,7 +344,7 @@ Semantic tokens are defined once per theme as CSS variables. Light/dark ship by 
 1. **Foundation** — Next.js, TypeScript, Tailwind/shadcn, Drizzle/Neon, Better Auth, authenticated shell, CI. ✅
 2. **Documents** — Native workspace/folder/document CRUD, Tiptap Markdown editor, autosave, export `.md`. ✅
 3. **Keyboard UX** — shortcut registry, command palette, quick open, focus mode, shortcut help. ✅
-4. **Collaboration** — Yjs + PartyKit, presence, cursors, status/reconnect. Gate: two browsers converge reliably. ✅
+4. **Collaboration** — Yjs + Hocuspocus, presence, cursors, status/reconnect. Gate: two browsers converge reliably. ✅
 5. **Developer features** — syntax highlighting, code blocks, tables/checklists/callouts polish.
 6. **Native history & search** — snapshots/diffs, title/content search, recents.
 7. **GitHub foundation** — GitHub connection, repository selection, root-path selection, repository/document mapping.

@@ -1,6 +1,6 @@
 # Deployment
 
-Target: **Vercel** (app) + **Neon** (Postgres) + **PartyKit** (realtime). Total cost at MVP scale: ~$0.
+Target: **Vercel** (app) + **Neon** (Postgres) + **Hocuspocus on Render** (realtime). Total cost at MVP scale: ~$0.
 
 ## Environments
 
@@ -37,40 +37,59 @@ Target: **Vercel** (app) + **Neon** (Postgres) + **PartyKit** (realtime). Total 
 
    Subsequent migrations are applied automatically — see below.
 
-## Realtime collaboration (PartyKit)
+## Realtime collaboration (Hocuspocus on Render)
 
 The app deploys and runs without it — with `NEXT_PUBLIC_COLLAB_HOST` unset the
-editor works in solo mode. Realtime is a separate deployment:
+editor works in solo mode. Realtime is a separate long-running Node process
+(`server/collab.ts`) because serverless hosts cannot hold WebSockets open.
 
-1. **Account**: `bunx partykit login` (free tier).
-2. **Deploy the party**: `bunx partykit deploy` (config: `partykit.json`,
-   server: `party/doc.ts` — one room per document).
-3. **Party env** (production):
+> PartyKit was the original choice but became undeployable for new accounts
+> (their `partykit.dev` zone hit Cloudflare's custom-domain limit; their
+> cloud-prem mode emits legacy Durable Object migrations Cloudflare no longer
+> provisions). Hocuspocus is maintained by Tiptap's team and runs anywhere
+> Node runs. See ARCHITECTURE.md.
 
-   ```bash
-   partykit env add APP_URL=https://your-production-domain --production
-   partykit env add COLLAB_API_SECRET="<openssl rand -base64 32>" --production
-   ```
+**Render setup (free tier works):**
+
+1. Render → **New → Web Service** → connect this GitHub repo.
+2. Settings:
+   - **Build command**: `npm install` (or `bun install`)
+   - **Start command**: `npx tsx server/collab.ts`
+   - **Instance type**: Free
+3. Environment variables (Render):
+
+   | Variable | Value |
+   | --- | --- |
+   | `APP_URL` | `https://your-production-domain` |
+   | `COLLAB_API_SECRET` | `openssl rand -base64 32` |
+
+   `PORT` is injected by Render and read by the server automatically.
 
 4. **Vercel env** (Production):
 
    | Variable | Value |
    | --- | --- |
-   | `NEXT_PUBLIC_COLLAB_HOST` | `<project>.<user>.partykit.dev` |
-   | `COLLAB_API_SECRET` | same value as the party's |
+   | `NEXT_PUBLIC_COLLAB_HOST` | `<service>.onrender.com` |
+   | `COLLAB_API_SECRET` | same value as Render's |
 
    Redeploy the app after adding the variables — `NEXT_PUBLIC_*` is inlined at
    build time.
 
-`COLLAB_API_SECRET` authenticates the service calls in both directions: the
-app signs room tickets with it, and the party presents it when it reads room
-bootstrap state or writes Yjs snapshots (`/api/collab/*`). Rotating it
-requires updating both sides; existing room tickets expire within two minutes.
+Free-tier note: Render spins idle services down after ~15 minutes; the first
+connection afterwards waits out a cold start (~30–60s) while the client
+retries, then everything works. Upgrade to a paid instance to remove the
+cold start.
 
-Local development: `bunx partykit dev --var "APP_URL=http://localhost:3000"`
-alongside `bun run dev`, with `NEXT_PUBLIC_COLLAB_HOST=127.0.0.1:1999` and a
-matching `COLLAB_API_SECRET` in `.env.local`. The E2E suite starts both
-servers itself (see `playwright.config.ts`).
+`COLLAB_API_SECRET` authenticates the service calls in both directions: the
+app signs room tickets with it, and the collab server presents it when it
+reads bootstrap state or writes Yjs snapshots (`/api/collab/*`). Rotating it
+requires updating both sides; existing tickets expire within two minutes.
+
+Local development: `PORT=1999 APP_URL=http://localhost:3000
+COLLAB_API_SECRET=dev-secret bunx tsx server/collab.ts` alongside
+`bun run dev`, with `NEXT_PUBLIC_COLLAB_HOST=127.0.0.1:1999` and a matching
+`COLLAB_API_SECRET` in `.env.local`. The E2E suite starts both servers itself
+(see `playwright.config.ts`).
 
 ## CI/CD
 
