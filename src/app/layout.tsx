@@ -7,17 +7,17 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Native",
-    template: "%s · Native",
+    default: "Editora",
+    template: "%s · Editora",
   },
   description:
-    "A collaborative Markdown workspace for developers. Google Docs for technical knowledge, Markdown as the underlying format.",
+    "A collaborative writing room for clear thinking and lasting words.",
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "oklch(1 0 0)" },
-    { media: "(prefers-color-scheme: dark)", color: "oklch(0.145 0 0)" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f3ed" },
+    { media: "(prefers-color-scheme: dark)", color: "#1e2925" },
   ],
 };
 
