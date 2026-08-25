@@ -11,7 +11,8 @@ knowledge, with Markdown as the underlying format.
 - **Next.js** (App Router) · React · strict TypeScript
 - **Tailwind CSS v4** + **shadcn/ui** (Base UI primitives)
 - **PostgreSQL** via **Drizzle ORM** (Neon-compatible)
-- **Neon Auth** (managed Better Auth) — email/password with custom app UI
+- **Neon Auth** (managed Better Auth) — email/password, GitHub, and Google
+  sign-in with a custom app UI
 - **Bun** as package manager and script runner
 - Deploy target: Vercel + Neon (see [DEPLOYMENT.md](./DEPLOYMENT.md))
 

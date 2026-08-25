@@ -21,12 +21,15 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+import { SocialSignInButtons } from "@/features/auth/social-sign-in-buttons";
 
 export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
+  const [socialPending, setSocialPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -66,17 +69,29 @@ export function SignInForm() {
           Enter your credentials to open your workspace.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-5">
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        ) : null}
+        <SocialSignInButtons
+          disabled={pending}
+          onError={setError}
+          onPendingChange={setSocialPending}
+        />
+        <div className="flex items-center gap-3">
+          <Separator />
+          <span className="shrink-0 font-mono text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
+            or email
+          </span>
+          <Separator />
+        </div>
         <form id="sign-in-form" onSubmit={handleSubmit}>
           <FieldGroup>
-            {error ? (
-              <div
-                role="alert"
-                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-              >
-                {error}
-              </div>
-            ) : null}
             <Field>
               <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
@@ -108,7 +123,7 @@ export function SignInForm() {
         <Button
           type="submit"
           form="sign-in-form"
-          disabled={pending}
+          disabled={pending || socialPending}
           className="w-full"
         >
           {pending ? <Spinner data-icon="inline-start" /> : null}

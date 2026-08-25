@@ -62,6 +62,20 @@ Neon Auth with email/password and custom app-owned forms (`src/lib/auth`). Notes
 - `proxy.ts` protects `/app` and refreshes the signed Neon session cache.
 - A personal workspace is provisioned on the first authenticated `/app` request.
 
+### OAuth providers
+
+GitHub and Google controls are rendered by the app; Neon Auth performs the
+OAuth exchange. Enable each provider in the Neon Auth console, choosing shared
+credentials for quick testing or custom credentials for Editora-branded consent.
+When using custom credentials, register these provider callback URLs:
+
+```text
+${NEON_AUTH_BASE_URL}/callback/github
+${NEON_AUTH_BASE_URL}/callback/google
+```
+
+The app returns users to `/app` after sign-in (or a safe in-app `next` path).
+
 ## Conventions
 
 - Strict TypeScript; no non-null assertions in app code where avoidable.

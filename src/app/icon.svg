@@ -1,4 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="18" fill="#314039"/>
-  <path fill="#fff" d="M18 15h30v8H28v9h17v8H28v9h21v8H18V15Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Editora</title>
+  <rect width="512" height="512" fill="#f6f3ed"/>
+  <circle cx="256" cy="256" r="228" fill="#102017"/>
+  <text
+    x="256"
+    y="357"
+    fill="#fdfcf8"
+    font-family="Iowan Old Style, Palatino Linotype, Book Antiqua, Georgia, serif"
+    font-size="290"
+    font-weight="400"
+    text-anchor="middle"
+  >E</text>
 </svg>
