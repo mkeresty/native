@@ -20,9 +20,11 @@ export async function proxy(request: NextRequest) {
   );
 
   const isOAuthCallback = request.nextUrl.searchParams.has(OAUTH_SESSION_VERIFIER_PARAM);
-  const authRequest = isOAuthCallback
-    ? requestWithApplicationOrigin(request)
-    : request;
+  // Browser document requests do not include an Origin header and an OAuth
+  // return may carry Google or GitHub as its Referer. Neon uses that value for
+  // its trusted-origin check both during the verifier exchange and during the
+  // following server session lookup. Always provide the canonical app origin.
+  const authRequest = requestWithApplicationOrigin(request);
 
   const response = await getAuth().middleware({ loginUrl: loginUrl.toString() })(
     authRequest,
@@ -61,10 +63,9 @@ function logOAuthCallbackResult(request: NextRequest, response: Response): void 
 }
 
 /**
- * OAuth callbacks arrive with the provider as their Referer. The Neon SDK
- * forwards that value as Origin during its verifier exchange, which violates
- * Neon Auth's trusted-origin check. Use the callback's actual application
- * origin instead, without forwarding any provider or token data.
+ * Forward a canonical app Origin into Neon Auth and the downstream request.
+ * This prevents a provider Referer from being treated as the request Origin by
+ * Neon Auth's session APIs.
  */
 function requestWithApplicationOrigin(request: NextRequest): NextRequest {
   const headers = new Headers(request.headers);
