@@ -1,4 +1,4 @@
-import type { NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 
 import { getAuth } from "@/lib/auth/server";
 
@@ -16,25 +16,26 @@ export async function proxy(request: NextRequest) {
     `${request.nextUrl.pathname}${request.nextUrl.search}`,
   );
 
-  const response = await getAuth().middleware({ loginUrl: loginUrl.toString() })(
-    request,
+  const isOAuthCallback = request.nextUrl.searchParams.has(
+    "neon_auth_session_verifier",
   );
+  const authRequest = isOAuthCallback
+    ? requestWithApplicationOrigin(request)
+    : request;
 
-  // Neon Auth intentionally treats an unsuccessful session exchange as an
-  // unauthenticated request. Record only the handoff state, never credentials
-  // or verifier values, so a production OAuth loop can be diagnosed.
-  if (request.nextUrl.searchParams.has("neon_auth_session_verifier")) {
-    const location = response.headers.get("location");
-    console.info("[auth] OAuth callback handoff", {
-      hasChallengeCookie:
-        request.cookies.has("__Secure-neon-auth.session_challenge") ||
-        request.cookies.has("__Secure-neon-auth.session_challange"),
-      redirectedToSignIn: location?.includes("/sign-in") ?? false,
-      responseStatus: response.status,
-    });
-  }
+  return getAuth().middleware({ loginUrl: loginUrl.toString() })(authRequest);
+}
 
-  return response;
+/**
+ * OAuth callbacks arrive with the provider as their Referer. The Neon SDK
+ * forwards that value as Origin during its verifier exchange, which violates
+ * Neon Auth's trusted-origin check. Use the callback's actual application
+ * origin instead, without forwarding any provider or token data.
+ */
+function requestWithApplicationOrigin(request: NextRequest): NextRequest {
+  const headers = new Headers(request.headers);
+  headers.set("origin", request.nextUrl.origin);
+  return new NextRequest(request, { headers });
 }
 
 export const config = {
