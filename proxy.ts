@@ -28,9 +28,36 @@ export async function proxy(request: NextRequest) {
     authRequest,
   );
 
-  return isOAuthCallback
+  const result = isOAuthCallback
     ? removeVerifierFromFailedCallbackRedirect(response, request)
     : response;
+
+  if (isOAuthCallback) {
+    logOAuthCallbackResult(request, result);
+  }
+
+  return result;
+}
+
+/**
+ * Temporary, privacy-safe callback tracing. It deliberately records neither
+ * verifier values nor cookies—only whether the expected challenge arrived and
+ * which cookie names Neon returned to the browser.
+ */
+function logOAuthCallbackResult(request: NextRequest, response: Response): void {
+  const cookieNames = response.headers
+    .getSetCookie()
+    .map((cookie) => cookie.slice(0, cookie.indexOf("=")))
+    .filter(Boolean);
+  const location = response.headers.get("location");
+  const redirectPath = location ? new URL(location, request.url).pathname : null;
+
+  console.info("[oauth] callback result", {
+    hasChallenge: request.cookies.has("__Secure-neon-auth.session_challenge"),
+    responseStatus: response.status,
+    redirectPath,
+    cookieNames,
+  });
 }
 
 /**
