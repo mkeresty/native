@@ -123,6 +123,28 @@ export const workspaceMember = pgTable(
   ],
 );
 
+/**
+ * Join links. One active link per workspace: regenerating deletes the old
+ * token, which is also how an owner revokes access. Links are multi-use —
+ * every redemption adds the redeeming profile as a workspace member.
+ */
+export const workspaceInvite = pgTable(
+  "workspace_invite",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    role: workspaceRole("role").notNull().default("member"),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("workspace_invite_workspace_idx").on(table.workspaceId)],
+);
+
 export const folder = pgTable(
   "folder",
   {

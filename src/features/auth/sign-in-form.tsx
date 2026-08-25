@@ -30,7 +30,14 @@ export function SignInForm() {
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
   const [socialPending, setSocialPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    const provider = searchParams.get("oauth");
+    if (!searchParams.has("error") || !["github", "google"].includes(provider ?? "")) {
+      return null;
+    }
+    const providerName = provider === "github" ? "GitHub" : "Google";
+    return `${providerName} sign-in did not complete. Please try again or use email.`;
+  });
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -84,11 +91,15 @@ export function SignInForm() {
           onPendingChange={setSocialPending}
         />
         <div className="flex items-center gap-3">
-          <Separator />
+          <div className="min-w-0 flex-1">
+            <Separator />
+          </div>
           <span className="shrink-0 font-mono text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
             or email
           </span>
-          <Separator />
+          <div className="min-w-0 flex-1">
+            <Separator />
+          </div>
         </div>
         <form id="sign-in-form" onSubmit={handleSubmit}>
           <FieldGroup>

@@ -8,6 +8,7 @@ import {
   MoonStarIcon,
   PanelLeftIcon,
   PlusIcon,
+  UserPlusIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -33,9 +34,10 @@ export type PaletteDocument = { id: string; title: string };
 
 type Props = {
   documents: PaletteDocument[];
+  onInvite?: () => void;
 };
 
-export function CommandPalette({ documents }: Props) {
+export function CommandPalette({ documents, onInvite }: Props) {
   const router = useRouter();
   const { setTheme } = useTheme();
   const { toggleSidebar } = useSidebar();
@@ -132,7 +134,18 @@ export function CommandPalette({ documents }: Props) {
 
             <CommandSeparator />
 
-            <CommandGroup heading="Navigate">
+            <CommandGroup heading="Workspace">
+              {onInvite ? (
+                <CommandItem
+                  onSelect={() => {
+                    setOpen(false);
+                    onInvite();
+                  }}
+                >
+                  <UserPlusIcon />
+                  Invite collaborator
+                </CommandItem>
+              ) : null}
               <CommandItem
                 onSelect={() => {
                   setOpen(false);

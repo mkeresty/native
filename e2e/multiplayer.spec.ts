@@ -1,5 +1,3 @@
-import { execSync } from "node:child_process";
-
 import { expect, test, type Page } from "@playwright/test";
 import { test as pageErrorTest } from "./fixtures";
 
@@ -55,7 +53,7 @@ pageErrorTest("two users edit the same document concurrently", async ({
 
   const contextA = await browser.newContext();
   const pageA = await contextA.newPage();
-  const emailA = await signUp(pageA, "Alice Writer");
+  await signUp(pageA, "Alice Writer");
 
   await pageA.getByRole("button", { name: "New document" }).first().click();
   await pageA.waitForURL(/\/app\/doc\//);
@@ -66,14 +64,31 @@ pageErrorTest("two users edit the same document concurrently", async ({
   await editorA.click();
   await editorA.type("# Shared notes");
 
+  // A creates a join link via the real product flow (workspace menu).
+  await pageA.getByRole("button", { name: "Switch workspace" }).click();
+  await pageA
+    .locator("[data-slot=dropdown-menu-content]")
+    .getByRole("menuitem", { name: "Invite people" })
+    .click();
+  const inviteDialog = pageA.getByRole("dialog");
+  await expect(
+    inviteDialog.getByRole("heading", { name: /Invite to/ }),
+  ).toBeVisible();
+  const inviteLink = await inviteDialog
+    .getByLabel("Invite link")
+    .inputValue();
+  expect(inviteLink).toContain("/app/join/");
+  await pageA.keyboard.press("Escape");
+
   const contextB = await browser.newContext();
   const pageB = await contextB.newPage();
-  const emailB = await signUp(pageB, "Bob Writer");
-  // No invite flow exists yet, so the harness seats B in A's workspace.
-  execSync(
-    `bun scripts/e2e-add-member.ts ${emailB} ${emailA}`,
-    { cwd: process.cwd(), stdio: "pipe" },
-  );
+  await signUp(pageB, "Bob Writer");
+
+  // B redeems the link and lands in A's workspace.
+  await pageB.goto(inviteLink);
+  await pageB.waitForURL(/app$/);
+
+  // B opens A's document — membership grants access.
   await pageB.goto(documentUrl);
 
   // B sees A's text.

@@ -24,6 +24,17 @@ function callbackPath(next: string | null) {
   return next?.startsWith("/") && !next.startsWith("//") ? next : "/app";
 }
 
+function callbackUrl(next: string | null) {
+  return new URL(callbackPath(next), window.location.origin).toString();
+}
+
+function errorCallbackUrl(provider: SocialProvider) {
+  const url = new URL("/sign-in", window.location.origin);
+  url.searchParams.set("oauth", provider);
+  url.searchParams.set("error", "oauth");
+  return url.toString();
+}
+
 /**
  * App-owned OAuth controls. Neon Auth manages the provider handshake, while
  * Editora owns the copy, visual treatment, and where users return afterward.
@@ -44,9 +55,12 @@ export function SocialSignInButtons({
     onPendingChange(true);
 
     try {
+      const returnUrl = callbackUrl(searchParams.get("next"));
       const { error } = await authClient.signIn.social({
         provider,
-        callbackURL: callbackPath(searchParams.get("next")),
+        callbackURL: returnUrl,
+        newUserCallbackURL: returnUrl,
+        errorCallbackURL: errorCallbackUrl(provider),
       });
       if (error) {
         onError(

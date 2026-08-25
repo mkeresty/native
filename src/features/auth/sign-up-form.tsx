@@ -85,11 +85,15 @@ export function SignUpForm() {
           onPendingChange={setSocialPending}
         />
         <div className="flex items-center gap-3">
-          <Separator />
+          <div className="min-w-0 flex-1">
+            <Separator />
+          </div>
           <span className="shrink-0 font-mono text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
             or email
           </span>
-          <Separator />
+          <div className="min-w-0 flex-1">
+            <Separator />
+          </div>
         </div>
         <form id="sign-up-form" onSubmit={handleSubmit}>
           <FieldGroup>

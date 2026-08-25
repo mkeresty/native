@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronsUpDownIcon, LogOutIcon, SearchIcon } from "lucide-react";
+import { ChevronsUpDownIcon, LogOutIcon, SearchIcon, UserPlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
@@ -52,6 +52,7 @@ import {
   useCommandPalette,
 } from "@/features/command-palette/command-palette-provider";
 import { CommandPalette } from "@/features/command-palette/command-palette";
+import { InviteDialog } from "@/features/workspace/invite-dialog";
 import { ShortcutsHelpDialog } from "@/features/command-palette/shortcuts-help-dialog";
 import { FocusModeProvider, useFocusMode } from "@/features/workspace/ui-state";
 import { createDocumentAction } from "@/features/documents/actions";
@@ -102,6 +103,8 @@ function ShellInner({
 }) {
   const { focused } = useFocusMode();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const activeWorkspace = workspaces[0];
 
   return (
     <SidebarProvider
@@ -111,7 +114,10 @@ function ShellInner({
       <FocusModeSidebarSync />
       <Sidebar collapsible="icon">
         <SidebarHeader className="px-[14px] pt-5 pb-0 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pt-4">
-          <WorkspaceSwitcher workspaces={workspaces} />
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            onInvite={() => setInviteOpen(true)}
+          />
         </SidebarHeader>
         <SidebarContent>
           <DocumentTree folders={folders} documents={documents} />
@@ -149,8 +155,19 @@ function ShellInner({
         </div>
         {focused ? <ExitFocusButton /> : null}
       </SidebarInset>
-      <CommandPalette documents={documents} />
+      <CommandPalette
+        documents={documents}
+        onInvite={activeWorkspace ? () => setInviteOpen(true) : undefined}
+      />
       <ShortcutsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
+      {activeWorkspace ? (
+        <InviteDialog
+          workspaceId={activeWorkspace.id}
+          workspaceName={activeWorkspace.name}
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+        />
+      ) : null}
     </SidebarProvider>
   );
 }
@@ -272,7 +289,13 @@ function ExitFocusButton() {
   );
 }
 
-function WorkspaceSwitcher({ workspaces }: { workspaces: WorkspaceSummary[] }) {
+function WorkspaceSwitcher({
+  workspaces,
+  onInvite,
+}: {
+  workspaces: WorkspaceSummary[];
+  onInvite: () => void;
+}) {
   const activeWorkspace = workspaces[0];
 
   return (
@@ -307,6 +330,15 @@ function WorkspaceSwitcher({ workspaces }: { workspaces: WorkspaceSummary[] }) {
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
+        {activeWorkspace ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onInvite}>
+              <UserPlusIcon />
+              Invite people
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
