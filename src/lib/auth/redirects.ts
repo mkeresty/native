@@ -1,4 +1,5 @@
 const DEFAULT_CALLBACK_PATH = "/app";
+const OAUTH_SESSION_VERIFIER_PARAM = "neon_auth_session_verifier";
 
 /**
  * Limits post-auth navigation to local application paths. This avoids an open
@@ -15,7 +16,11 @@ export function getSafeCallbackPath(next: string | null | undefined): string {
     return DEFAULT_CALLBACK_PATH;
   }
 
-  return next;
+  // An OAuth verifier is single-use. Never carry it into another sign-in
+  // attempt, where it could be mistaken for the new provider callback.
+  const url = new URL(next, "https://editora.invalid");
+  url.searchParams.delete(OAUTH_SESSION_VERIFIER_PARAM);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 /** Creates an auth-page link without dropping a meaningful return path. */

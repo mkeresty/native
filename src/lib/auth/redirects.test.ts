@@ -14,6 +14,14 @@ describe("getSafeCallbackPath", () => {
     expect(getSafeCallbackPath("//example.com")).toBe("/app");
     expect(getSafeCallbackPath("/\\example.com")).toBe("/app");
   });
+
+  it("removes an expired OAuth verifier from a callback path", () => {
+    expect(
+      getSafeCallbackPath(
+        "/app?view=recent&neon_auth_session_verifier=single-use-token",
+      ),
+    ).toBe("/app?view=recent");
+  });
 });
 
 describe("getAuthPageHref", () => {
