@@ -8,7 +8,15 @@ import { getAuth } from "@/lib/auth/server";
  * new visitor can create an account with our custom UI.
  */
 export async function proxy(request: NextRequest) {
-  return getAuth().middleware({ loginUrl: "/sign-in" })(request);
+  const loginUrl = request.nextUrl.clone();
+  loginUrl.pathname = "/sign-in";
+  loginUrl.search = "";
+  loginUrl.searchParams.set(
+    "next",
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
+
+  return getAuth().middleware({ loginUrl: loginUrl.toString() })(request);
 }
 
 export const config = {

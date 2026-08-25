@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth/client";
+import { getAuthPageHref, getSafeCallbackPath } from "@/lib/auth/redirects";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,9 +29,17 @@ import { SocialSignInButtons } from "@/features/auth/social-sign-in-buttons";
 
 export function SignUpForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
   const [socialPending, setSocialPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    const provider = searchParams.get("oauth");
+    if (!searchParams.has("error") || !["github", "google"].includes(provider ?? "")) {
+      return null;
+    }
+    const providerName = provider === "github" ? "GitHub" : "Google";
+    return `${providerName} sign-up did not complete. Please try again or use email.`;
+  });
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,7 +62,7 @@ export function SignUpForm() {
         return;
       }
       toast.success("Account created. Welcome to Editora.");
-      router.replace("/app");
+      router.replace(getSafeCallbackPath(searchParams.get("next")));
       router.refresh();
     } catch {
       setError("Network error. Check your connection and try again.");
@@ -150,7 +159,7 @@ export function SignUpForm() {
         <p className="text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link
-            href="/sign-in"
+            href={getAuthPageHref("/sign-in", searchParams.get("next"))}
             className="font-medium underline-offset-4 hover:underline"
           >
             Sign in

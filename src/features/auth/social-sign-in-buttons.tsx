@@ -1,11 +1,12 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { type ComponentProps, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { authClient } from "@/lib/auth/client";
+import { getSafeCallbackPath } from "@/lib/auth/redirects";
 
 type SocialProvider = "github" | "google";
 
@@ -20,18 +21,20 @@ const providerLabel: Record<SocialProvider, string> = {
   google: "Google",
 };
 
-function callbackPath(next: string | null) {
-  return next?.startsWith("/") && !next.startsWith("//") ? next : "/app";
-}
-
 function callbackUrl(next: string | null) {
-  return new URL(callbackPath(next), window.location.origin).toString();
+  return new URL(getSafeCallbackPath(next), window.location.origin).toString();
 }
 
-function errorCallbackUrl(provider: SocialProvider) {
-  const url = new URL("/sign-in", window.location.origin);
+function errorCallbackUrl(
+  provider: SocialProvider,
+  authPath: string,
+  next: string | null,
+) {
+  const url = new URL(authPath, window.location.origin);
   url.searchParams.set("oauth", provider);
   url.searchParams.set("error", "oauth");
+  const callbackPath = getSafeCallbackPath(next);
+  if (callbackPath !== "/app") url.searchParams.set("next", callbackPath);
   return url.toString();
 }
 
@@ -44,6 +47,7 @@ export function SocialSignInButtons({
   onError,
   onPendingChange,
 }: SocialSignInButtonsProps) {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
     null,
@@ -55,12 +59,13 @@ export function SocialSignInButtons({
     onPendingChange(true);
 
     try {
-      const returnUrl = callbackUrl(searchParams.get("next"));
+      const next = searchParams.get("next");
+      const returnUrl = callbackUrl(next);
       const { error } = await authClient.signIn.social({
         provider,
         callbackURL: returnUrl,
         newUserCallbackURL: returnUrl,
-        errorCallbackURL: errorCallbackUrl(provider),
+        errorCallbackURL: errorCallbackUrl(provider, pathname, next),
       });
       if (error) {
         onError(

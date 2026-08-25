@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth/client";
+import { getAuthPageHref, getSafeCallbackPath } from "@/lib/auth/redirects";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -59,7 +60,7 @@ export function SignInForm() {
         return;
       }
       toast.success("Welcome back.");
-      router.replace(searchParams.get("next") ?? "/app");
+      router.replace(getSafeCallbackPath(searchParams.get("next")));
       router.refresh();
     } catch {
       setError("Network error. Check your connection and try again.");
@@ -143,7 +144,7 @@ export function SignInForm() {
         <p className="text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
-            href="/sign-up"
+            href={getAuthPageHref("/sign-up", searchParams.get("next"))}
             className="font-medium underline-offset-4 hover:underline"
           >
             Create one
