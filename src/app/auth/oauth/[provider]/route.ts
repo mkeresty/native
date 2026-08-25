@@ -55,9 +55,31 @@ export async function GET(request: NextRequest, context: Context) {
 
   const response = NextResponse.redirect(data.url);
   for (const cookie of authResponse.headers.getSetCookie()) {
-    response.headers.append("set-cookie", cookie);
+    response.headers.append("set-cookie", makeChallengeCookieCrossSiteSafe(cookie));
   }
+  // Every authorization attempt creates a one-time challenge. Never allow a
+  // CDN or browser cache to replay a redirect that belongs to another attempt.
+  response.headers.set("cache-control", "private, no-store, max-age=0");
   return response;
+}
+
+/**
+ * The challenge is a signed, short-lived cookie that exists only to bind the
+ * provider return to the browser that started it. OAuth returns from Google
+ * and GitHub cross-site; `SameSite=None` is required for that callback in
+ * browsers that do not carry a Lax cookie through the provider redirect.
+ */
+function makeChallengeCookieCrossSiteSafe(cookie: string): string {
+  const isChallengeCookie =
+    cookie.startsWith("__Secure-neon-auth.session_challenge=") ||
+    cookie.startsWith("__Secure-neon-auth.session_challange=");
+  if (!isChallengeCookie) return cookie;
+
+  if (/;\s*SameSite=/i.test(cookie)) {
+    return cookie.replace(/;\s*SameSite=[^;]*/i, "; SameSite=None");
+  }
+
+  return `${cookie}; SameSite=None`;
 }
 
 function createErrorCallbackURL(
