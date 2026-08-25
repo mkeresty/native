@@ -61,7 +61,7 @@ export function SocialSignInButtons({
     try {
       const next = searchParams.get("next");
       const returnUrl = callbackUrl(next);
-      const { error } = await authClient.signIn.social({
+      const { data, error } = await authClient.signIn.social({
         provider,
         callbackURL: returnUrl,
         newUserCallbackURL: returnUrl,
@@ -72,7 +72,18 @@ export function SocialSignInButtons({
           error.message ??
             `Could not begin ${providerLabel[provider]} sign-in. Please try again.`,
         );
+        return;
       }
+
+      // The service returns a provider URL as JSON. Better Auth normally
+      // follows it via a redirect hook, but navigate explicitly so the custom
+      // app-owned controls behave consistently in every browser context.
+      if (data?.url) {
+        window.location.assign(data.url);
+        return;
+      }
+
+      onError(`Could not begin ${providerLabel[provider]} sign-in. Please try again.`);
     } catch {
       onError("Network error. Check your connection and try again.");
     } finally {
