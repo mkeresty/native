@@ -9,10 +9,10 @@ import { getSafeCallbackPath } from "@/lib/auth/redirects";
 type SocialProvider = "github" | "google";
 
 function oauthStartUrl(provider: SocialProvider, next: string | null) {
-  const url = new URL(`/auth/oauth/${provider}`, window.location.origin);
+  const url = new URL(`/auth/oauth/${provider}`, "https://editora.invalid");
   const callbackPath = getSafeCallbackPath(next);
   if (callbackPath !== "/app") url.searchParams.set("next", callbackPath);
-  return url.toString();
+  return `${url.pathname}${url.search}`;
 }
 
 /**
