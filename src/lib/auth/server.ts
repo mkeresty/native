@@ -12,7 +12,6 @@ export function getAuth(): NeonAuth {
 
   const baseUrl = process.env.NEON_AUTH_BASE_URL;
   const cookieSecret = process.env.NEON_AUTH_COOKIE_SECRET;
-  const cookieDomain = process.env.NEON_AUTH_COOKIE_DOMAIN;
   if (!baseUrl || !cookieSecret) {
     throw new Error(
       "Neon Auth is not configured. Set NEON_AUTH_BASE_URL and NEON_AUTH_COOKIE_SECRET.",
@@ -21,10 +20,10 @@ export function getAuth(): NeonAuth {
 
   auth = createNeonAuth({
     baseUrl,
-    cookies: {
-      secret: cookieSecret,
-      ...(cookieDomain ? { domain: cookieDomain } : {}),
-    },
+    // Editora is served from one canonical host (`editora.sh`). Host-only
+    // cookies are more reliable for the OAuth return than a configurable
+    // cross-subdomain Domain attribute, which browsers may reject or not send.
+    cookies: { secret: cookieSecret },
     // Temporary production diagnostics for the OAuth session handoff. Neon
     // logs request paths and upstream statuses, not credentials or tokens.
     logLevel: "debug",
