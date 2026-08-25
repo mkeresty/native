@@ -12,9 +12,7 @@ export function getAuth(): NeonAuth {
 
   const baseUrl = process.env.NEON_AUTH_BASE_URL;
   const cookieSecret = process.env.NEON_AUTH_COOKIE_SECRET;
-  const cookieDomain =
-    process.env.NEON_AUTH_COOKIE_DOMAIN ??
-    (process.env.VERCEL_ENV === "production" ? ".editora.sh" : undefined);
+  const cookieDomain = process.env.NEON_AUTH_COOKIE_DOMAIN;
   if (!baseUrl || !cookieSecret) {
     throw new Error(
       "Neon Auth is not configured. Set NEON_AUTH_BASE_URL and NEON_AUTH_COOKIE_SECRET.",
