@@ -310,10 +310,10 @@ function WorkspaceSwitcher({
         }
       >
         <span className="flex aspect-square size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary font-heading text-[18px] font-semibold text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:text-lg">
-          A
+          {activeWorkspace ? initials(activeWorkspace.name).charAt(0) : "—"}
         </span>
         <span className="truncate leading-[1.35] font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-          atelier
+          {activeWorkspace?.name ?? "Workspace"}
         </span>
         <ChevronsUpDownIcon className="ml-auto size-3.5 opacity-0 transition-opacity duration-150 group-hover/menu-button:opacity-50 group-data-[collapsible=icon]:hidden" />
       </DropdownMenuTrigger>
@@ -333,7 +333,8 @@ function WorkspaceSwitcher({
         {activeWorkspace ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onInvite}>
+            {/* Base UI Menu items take onClick (not Radix's onSelect). */}
+            <DropdownMenuItem onClick={onInvite}>
               <UserPlusIcon />
               Invite people
             </DropdownMenuItem>
