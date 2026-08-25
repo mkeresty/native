@@ -25,6 +25,9 @@ export function getAuth(): NeonAuth {
       secret: cookieSecret,
       ...(cookieDomain ? { domain: cookieDomain } : {}),
     },
+    // Temporary production diagnostics for the OAuth session handoff. Neon
+    // logs request paths and upstream statuses, not credentials or tokens.
+    logLevel: "debug",
   });
   return auth;
 }
