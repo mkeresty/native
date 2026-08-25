@@ -16,7 +16,25 @@ export async function proxy(request: NextRequest) {
     `${request.nextUrl.pathname}${request.nextUrl.search}`,
   );
 
-  return getAuth().middleware({ loginUrl: loginUrl.toString() })(request);
+  const response = await getAuth().middleware({ loginUrl: loginUrl.toString() })(
+    request,
+  );
+
+  // Neon Auth intentionally treats an unsuccessful session exchange as an
+  // unauthenticated request. Record only the handoff state, never credentials
+  // or verifier values, so a production OAuth loop can be diagnosed.
+  if (request.nextUrl.searchParams.has("neon_auth_session_verifier")) {
+    const location = response.headers.get("location");
+    console.info("[auth] OAuth callback handoff", {
+      hasChallengeCookie:
+        request.cookies.has("__Secure-neon-auth.session_challenge") ||
+        request.cookies.has("__Secure-neon-auth.session_challange"),
+      redirectedToSignIn: location?.includes("/sign-in") ?? false,
+      responseStatus: response.status,
+    });
+  }
+
+  return response;
 }
 
 export const config = {
