@@ -1,38 +1,15 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
-import { type ComponentProps, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import type { ComponentProps } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
-import { authClient } from "@/lib/auth/client";
 import { getSafeCallbackPath } from "@/lib/auth/redirects";
 
 type SocialProvider = "github" | "google";
 
-type SocialSignInButtonsProps = {
-  disabled?: boolean;
-  onError: (error: string | null) => void;
-  onPendingChange: (pending: boolean) => void;
-};
-
-const providerLabel: Record<SocialProvider, string> = {
-  github: "GitHub",
-  google: "Google",
-};
-
-function callbackUrl(next: string | null) {
-  return new URL(getSafeCallbackPath(next), window.location.origin).toString();
-}
-
-function errorCallbackUrl(
-  provider: SocialProvider,
-  authPath: string,
-  next: string | null,
-) {
-  const url = new URL(authPath, window.location.origin);
-  url.searchParams.set("oauth", provider);
-  url.searchParams.set("error", "oauth");
+function oauthStartUrl(provider: SocialProvider, next: string | null) {
+  const url = new URL(`/auth/oauth/${provider}`, window.location.origin);
   const callbackPath = getSafeCallbackPath(next);
   if (callbackPath !== "/app") url.searchParams.set("next", callbackPath);
   return url.toString();
@@ -42,84 +19,26 @@ function errorCallbackUrl(
  * App-owned OAuth controls. Neon Auth manages the provider handshake, while
  * Editora owns the copy, visual treatment, and where users return afterward.
  */
-export function SocialSignInButtons({
-  disabled = false,
-  onError,
-  onPendingChange,
-}: SocialSignInButtonsProps) {
-  const pathname = usePathname();
+export function SocialSignInButtons() {
   const searchParams = useSearchParams();
-  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
-    null,
-  );
-
-  async function continueWith(provider: SocialProvider) {
-    onError(null);
-    setPendingProvider(provider);
-    onPendingChange(true);
-
-    try {
-      const next = searchParams.get("next");
-      const returnUrl = callbackUrl(next);
-      const { data, error } = await authClient.signIn.social({
-        provider,
-        callbackURL: returnUrl,
-        newUserCallbackURL: returnUrl,
-        errorCallbackURL: errorCallbackUrl(provider, pathname, next),
-      });
-      if (error) {
-        onError(
-          error.message ??
-            `Could not begin ${providerLabel[provider]} sign-in. Please try again.`,
-        );
-        return;
-      }
-
-      // The service returns a provider URL as JSON. Better Auth normally
-      // follows it via a redirect hook, but navigate explicitly so the custom
-      // app-owned controls behave consistently in every browser context.
-      if (data?.url) {
-        window.location.assign(data.url);
-        return;
-      }
-
-      onError(`Could not begin ${providerLabel[provider]} sign-in. Please try again.`);
-    } catch {
-      onError("Network error. Check your connection and try again.");
-    } finally {
-      setPendingProvider(null);
-      onPendingChange(false);
-    }
-  }
+  const next = searchParams.get("next");
 
   return (
     <div aria-label="Continue with a social account" className="flex flex-col gap-2">
       <Button
-        type="button"
         variant="outline"
         className="w-full"
-        disabled={disabled || pendingProvider !== null}
-        onClick={() => void continueWith("github")}
+        render={<a href={oauthStartUrl("github", next)} />}
       >
-        {pendingProvider === "github" ? (
-          <Spinner data-icon="inline-start" />
-        ) : (
-          <GitHubMark data-icon="inline-start" />
-        )}
+        <GitHubMark data-icon="inline-start" />
         Continue with GitHub
       </Button>
       <Button
-        type="button"
         variant="outline"
         className="w-full"
-        disabled={disabled || pendingProvider !== null}
-        onClick={() => void continueWith("google")}
+        render={<a href={oauthStartUrl("google", next)} />}
       >
-        {pendingProvider === "google" ? (
-          <Spinner data-icon="inline-start" />
-        ) : (
-          <GoogleMark data-icon="inline-start" />
-        )}
+        <GoogleMark data-icon="inline-start" />
         Continue with Google
       </Button>
     </div>

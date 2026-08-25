@@ -30,7 +30,6 @@ export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
-  const [socialPending, setSocialPending] = useState(false);
   const [error, setError] = useState<string | null>(() => {
     const provider = searchParams.get("oauth");
     if (!searchParams.has("error") || !["github", "google"].includes(provider ?? "")) {
@@ -86,11 +85,7 @@ export function SignInForm() {
             {error}
           </div>
         ) : null}
-        <SocialSignInButtons
-          disabled={pending}
-          onError={setError}
-          onPendingChange={setSocialPending}
-        />
+        <SocialSignInButtons />
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <Separator />
@@ -135,7 +130,7 @@ export function SignInForm() {
         <Button
           type="submit"
           form="sign-in-form"
-          disabled={pending || socialPending}
+          disabled={pending}
           className="w-full"
         >
           {pending ? <Spinner data-icon="inline-start" /> : null}
