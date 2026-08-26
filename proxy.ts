@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { getSafeCallbackPath } from "@/lib/auth/redirects";
 import { getAuth } from "@/lib/auth/server";
@@ -11,6 +11,15 @@ const OAUTH_SESSION_VERIFIER_PARAM = "neon_auth_session_verifier";
  * new visitor can create an account with our custom UI.
  */
 export async function proxy(request: NextRequest) {
+  // Neon Auth's middleware can interfere with Server Action POSTs (a known
+  // rough edge). Actions enforce their own session checks via requireUserId,
+  // so pass them straight through.
+  const isServerAction =
+    request.method === "POST" && request.headers.get("next-action") !== null;
+  if (isServerAction) {
+    return NextResponse.next();
+  }
+
   const loginUrl = request.nextUrl.clone();
   loginUrl.pathname = "/sign-in";
   loginUrl.search = "";
