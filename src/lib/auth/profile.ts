@@ -34,6 +34,11 @@ export async function getApplicationUserId(authUser: NeonAuthUser): Promise<stri
 
   if (emailMatch) {
     if (emailMatch.authUserId && emailMatch.authUserId !== authUser.id) {
+      // A verified OAuth identity proves control of the same email address.
+      // Reuse the existing application profile without replacing its primary
+      // authUserId so multiple Neon Auth identities can resolve to one profile.
+      if (authUser.emailVerified) return emailMatch.id;
+
       throw new Error("This email is already linked to another Neon Auth account.");
     }
 
