@@ -1,44 +1,76 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { authClient } from "@/lib/auth/client";
 import { getSafeCallbackPath } from "@/lib/auth/redirects";
 
 type SocialProvider = "github" | "google";
 
-function oauthStartUrl(provider: SocialProvider, next: string | null) {
-  const url = new URL(`/auth/oauth/${provider}`, "https://editora.invalid");
-  const callbackPath = getSafeCallbackPath(next);
-  if (callbackPath !== "/app") url.searchParams.set("next", callbackPath);
-  return `${url.pathname}${url.search}`;
-}
-
 /**
- * App-owned OAuth controls. Neon Auth manages the provider handshake, while
- * Editora owns the copy, visual treatment, and where users return afterward.
+ * App-owned OAuth controls. Neon Auth manages the provider handshake,
+ * callback verification, and session cookies through its Next.js client.
  */
 export function SocialSignInButtons() {
   const searchParams = useSearchParams();
-  const next = searchParams.get("next");
+  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
+    null,
+  );
+
+  async function handleSocialSignIn(provider: SocialProvider) {
+    setPendingProvider(provider);
+
+    try {
+      const { error } = await authClient.signIn.social({
+        provider,
+        callbackURL: getSafeCallbackPath(searchParams.get("next")),
+      });
+
+      if (error) {
+        toast.error(error.message ?? `Could not sign in with ${provider}.`);
+        setPendingProvider(null);
+      }
+    } catch {
+      toast.error("Network error. Check your connection and try again.");
+      setPendingProvider(null);
+    }
+  }
 
   return (
-    <div aria-label="Continue with a social account" className="flex flex-col gap-2">
+    <div
+      aria-label="Continue with a social account"
+      className="flex flex-col gap-2"
+    >
       <Button
+        type="button"
         variant="outline"
         className="w-full"
-        render={<a href={oauthStartUrl("github", next)} />}
+        disabled={pendingProvider !== null}
+        onClick={() => void handleSocialSignIn("github")}
       >
-        <GitHubMark data-icon="inline-start" />
+        {pendingProvider === "github" ? (
+          <Spinner data-icon="inline-start" />
+        ) : (
+          <GitHubMark data-icon="inline-start" />
+        )}
         Continue with GitHub
       </Button>
       <Button
+        type="button"
         variant="outline"
         className="w-full"
-        render={<a href={oauthStartUrl("google", next)} />}
+        disabled={pendingProvider !== null}
+        onClick={() => void handleSocialSignIn("google")}
       >
-        <GoogleMark data-icon="inline-start" />
+        {pendingProvider === "google" ? (
+          <Spinner data-icon="inline-start" />
+        ) : (
+          <GoogleMark data-icon="inline-start" />
+        )}
         Continue with Google
       </Button>
     </div>
