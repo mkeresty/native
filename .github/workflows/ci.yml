@@ -85,5 +85,19 @@ jobs:
       - name: Apply migrations
         run: bun run db:migrate
 
+      # The E2E suite signs users up through Neon's hosted auth. A wrong
+      # secret value fails every test at sign-up with no server-side error,
+      # so surface safe diagnostics (shape/length/reachability only).
+      - name: Verify Neon Auth configuration
+        run: |
+          if [[ ! "$NEON_AUTH_BASE_URL" =~ ^https://.+/auth$ ]]; then
+            echo "::warning::NEON_AUTH_BASE_URL does not look like a Neon Auth endpoint (expected https://…/auth): ${NEON_AUTH_BASE_URL:0:24}…"
+          fi
+          if (( ${#NEON_AUTH_COOKIE_SECRET} < 32 )); then
+            echo "::warning::NEON_AUTH_COOKIE_SECRET is shorter than 32 characters (${#NEON_AUTH_COOKIE_SECRET})"
+          fi
+          curl -s -o /dev/null -w "auth service reachability: HTTP %{http_code}\n" \
+            --max-time 15 "$NEON_AUTH_BASE_URL/get-session" || echo "::warning::could not reach the Neon Auth service"
+
       - name: Run end-to-end tests
         run: bunx playwright test
