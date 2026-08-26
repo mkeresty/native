@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { db } from "@/db";
@@ -8,24 +8,54 @@ import { slugify } from "@/lib/utils/slugify";
 
 type Database = PostgresJsDatabase<typeof schema>;
 
+/**
+ * Provisions the default workspace for a brand-new profile. The first load of
+ * /app can render the layout more than once concurrently, so this is
+ * serialized per user with a transaction-scoped advisory lock: the second
+ * caller waits, finds the first caller's workspace, and returns it instead of
+ * racing it to a duplicate slug.
+ */
 export async function createDefaultWorkspace(
   database: Database,
   userId: string,
   userName: string,
 ) {
-  const baseName = `${userName.split(" ")[0] || "My"}'s Workspace`;
-  const slug = await uniqueSlug(database, slugify(baseName));
+  return database.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
 
-  const [created] = await database
-    .insert(workspace)
-    .values({ name: baseName, slug, createdBy: userId })
-    .returning();
+    const [existingMembership] = await tx
+      .select({ workspaceId: workspace.id, name: workspace.name, slug: workspace.slug })
+      .from(workspaceMember)
+      .innerJoin(workspace, eq(workspace.id, workspaceMember.workspaceId))
+      .where(eq(workspaceMember.userId, userId))
+      .orderBy(asc(workspace.createdAt))
+      .limit(1);
+    if (existingMembership) return existingMembership;
 
-  await database
-    .insert(workspaceMember)
-    .values({ workspaceId: created.id, userId, role: "owner" });
+    const baseName = `${userName.split(" ")[0] || "My"}'s Workspace`;
 
-  return created;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const base = slugify(baseName);
+      const slug =
+        attempt === 0 ? base : `${base}-${crypto.randomUUID().slice(0, 6)}`;
+
+      const [created] = await tx
+        .insert(workspace)
+        .values({ name: baseName, slug, createdBy: userId })
+        .onConflictDoNothing({ target: workspace.slug })
+        .returning();
+
+      if (created) {
+        await tx
+          .insert(workspaceMember)
+          .values({ workspaceId: created.id, userId, role: "owner" });
+        return created;
+      }
+      // Slug taken by someone else's workspace — try a fresh suffix.
+    }
+
+    throw new Error("Could not provision a default workspace");
+  });
 }
 
 export async function getUserWorkspaces(userId: string) {
@@ -40,19 +70,6 @@ export async function getUserWorkspaces(userId: string) {
     .innerJoin(workspace, eq(workspace.id, workspaceMember.workspaceId))
     .where(eq(workspaceMember.userId, userId))
     .orderBy(asc(workspace.createdAt));
-}
-
-async function uniqueSlug(database: Database, base: string): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const candidate = attempt === 0 ? base : `${base}-${crypto.randomUUID().slice(0, 6)}`;
-    const [existing] = await database
-      .select({ id: workspace.id })
-      .from(workspace)
-      .where(eq(workspace.slug, candidate))
-      .limit(1);
-    if (!existing) return candidate;
-  }
-  return `${base}-${Date.now().toString(36)}`;
 }
 
 /* --------------------------------------------------------------------- */
